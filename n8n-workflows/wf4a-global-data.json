@@ -1,0 +1,141 @@
+{
+  "name": "WF4a - Global Data Collector",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1-5" }]
+        }
+      },
+      "id": "cron-7am",
+      "name": "7:00 AM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if today is a market holiday\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\nconst dateStr = ist.toISOString().split('T')[0];\n// In production: query market_holidays table\n// For now, pass through\nreturn [{ json: { date: dateStr, is_holiday: false } }];"
+      },
+      "id": "holiday-check",
+      "name": "Holiday Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://nse-data-service:5000/global-indices",
+        "options": {}
+      },
+      "id": "fetch-global-indices",
+      "name": "NSE Service: Global Indices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 800, tools: [{ type: 'web_search_20250305', name: 'web_search' }], messages: [{ role: 'user', content: 'Search for today\\'s pre-market data for Indian stock markets. Find: 1) SGX Nifty / GIFT Nifty current level and change, 2) US markets close (Dow, S&P 500, Nasdaq), 3) Asian markets today (Nikkei, Hang Seng, Shanghai), 4) Crude oil (Brent) price, 5) Gold price, 6) USD/INR rate. Return ONLY a JSON object: { \"sgx_nifty\": { \"level\": number, \"change_pct\": number }, \"us_markets\": { \"dow\": { \"close\": number, \"change_pct\": number }, \"sp500\": { \"close\": number, \"change_pct\": number }, \"nasdaq\": { \"close\": number, \"change_pct\": number } }, \"asian_markets\": { \"nikkei\": { \"level\": number, \"change_pct\": number }, \"hang_seng\": { \"level\": number, \"change_pct\": number } }, \"commodities\": { \"brent_crude\": number, \"gold\": number }, \"usd_inr\": number, \"global_sentiment\": \"bullish|bearish|neutral\", \"key_events\": [\"event1\", \"event2\"] }' }] }) }}"
+      },
+      "id": "claude-global-search",
+      "name": "Claude: Global Market Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 400],
+      "credentials": {
+        "httpHeaderAuth": { "id": "CLAUDE_CREDENTIAL_ID", "name": "Claude API" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://finnhub.io/api/v1/news?category=general&minId=10",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {}
+      },
+      "id": "finnhub-news",
+      "name": "Finnhub: Market News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 600],
+      "credentials": {
+        "httpQueryAuth": { "id": "FINNHUB_CREDENTIAL_ID", "name": "Finnhub API" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all global data sources and store in staging_data\nconst globalIndices = $('NSE Service: Global Indices').first().json;\nconst claudeResponse = $('Claude: Global Market Search').first().json;\nconst finnhubNews = $('Finnhub: Market News').first().json;\n\n// Parse Claude's web search results\nlet globalCues = {};\ntry {\n  const text = claudeResponse.content\n    .filter(c => c.type === 'text')\n    .map(c => c.text)\n    .join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  globalCues = JSON.parse(clean);\n} catch (e) {\n  globalCues = { parse_error: e.message, raw: claudeResponse.content };\n}\n\n// Filter relevant Finnhub news (last 12 hours)\nconst twelveHoursAgo = Math.floor(Date.now() / 1000) - 12 * 3600;\nconst recentNews = Array.isArray(finnhubNews)\n  ? finnhubNews.filter(n => n.datetime > twelveHoursAgo).slice(0, 10)\n  : [];\n\nconst combinedData = {\n  global_indices: globalIndices,\n  global_cues: globalCues,\n  overnight_news: recentNews.map(n => ({\n    headline: n.headline,\n    source: n.source,\n    url: n.url,\n    summary: n.summary\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: $('Holiday Check').first().json.date } }];"
+      },
+      "id": "combine-global-data",
+      "name": "Combine Global Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'global_cues', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.date, JSON.stringify($json.data)] }}"
+          }
+        }
+      },
+      "id": "store-staging",
+      "name": "Store in Staging",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1160, 400],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    }
+  ],
+  "connections": {
+    "7:00 AM Mon-Fri": {
+      "main": [[{ "node": "Holiday Check", "type": "main", "index": 0 }]]
+    },
+    "Holiday Check": {
+      "main": [
+        [
+          { "node": "NSE Service: Global Indices", "type": "main", "index": 0 },
+          { "node": "Claude: Global Market Search", "type": "main", "index": 0 },
+          { "node": "Finnhub: Market News", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "NSE Service: Global Indices": {
+      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+    },
+    "Claude: Global Market Search": {
+      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+    },
+    "Finnhub: Market News": {
+      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+    },
+    "Combine Global Data": {
+      "main": [[{ "node": "Store in Staging", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "triggerCount": 1,
+  "active": false
+}

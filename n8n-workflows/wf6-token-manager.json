@@ -1,0 +1,134 @@
+{
+  "name": "WF6 - Kite Token Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "45 8 * * 1-5" }]
+        }
+      },
+      "id": "cron-845am",
+      "name": "8:45 AM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT u.id, u.telegram_user_id, u.private_chat_id, ks.access_token_encrypted, ks.token_expiry FROM users u LEFT JOIN kite_sessions ks ON u.id = ks.user_id WHERE u.is_kite_provider = true AND u.is_active = true LIMIT 1"
+      },
+      "id": "get-kite-user",
+      "name": "Get Kite Provider",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if current token is still valid\nconst user = $input.first().json;\nconst now = new Date();\n\nif (user.access_token_encrypted && user.token_expiry) {\n  const expiry = new Date(user.token_expiry);\n  if (expiry > now) {\n    // Token still valid — test it\n    return [{ json: { ...user, action: 'test_token' } }];\n  }\n}\n\n// Token expired or missing — need login\nreturn [{ json: { ...user, action: 'request_login' } }];"
+      },
+      "id": "check-token-validity",
+      "name": "Check Token Validity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "needs-login",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "request_login",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "needs-login",
+      "name": "Needs Login?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.private_chat_id }}",
+        "text": "🔑 *Kite Login Required*\n\nYour Zerodha session has expired. Please login to continue receiving live data:\n\n1. Click the link below\n2. Login with your Zerodha credentials\n3. You'll be redirected — copy the `request_token` from the URL\n4. Send me: `login YOUR_TOKEN_HERE`\n\n🔗 [Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key={{ $env.KITE_API_KEY_USER1 }})",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-login-request",
+      "name": "Send Login Request",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, 400],
+      "credentials": {
+        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.kite.trade/user/profile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Kite-Version", "value": "3" }]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "id": "test-kite-token",
+      "name": "Test Kite Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 200],
+      "credentials": {
+        "httpHeaderAuth": { "id": "KITE_CREDENTIAL_ID", "name": "Kite Connect" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if Kite token test was successful\nconst response = $input.first().json;\nif (response.status === 'success' || response.data?.user_id) {\n  return [{ json: { valid: true, user: response.data?.user_name || 'Unknown' } }];\n} else {\n  // Token invalid — need new login\n  return [{ json: { valid: false } }];\n}"
+      },
+      "id": "check-test-result",
+      "name": "Token Valid?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    }
+  ],
+  "connections": {
+    "8:45 AM Mon-Fri": {
+      "main": [[{ "node": "Get Kite Provider", "type": "main", "index": 0 }]]
+    },
+    "Get Kite Provider": {
+      "main": [[{ "node": "Check Token Validity", "type": "main", "index": 0 }]]
+    },
+    "Check Token Validity": {
+      "main": [[{ "node": "Needs Login?", "type": "main", "index": 0 }]]
+    },
+    "Needs Login?": {
+      "main": [
+        [{ "node": "Send Login Request", "type": "main", "index": 0 }],
+        [{ "node": "Test Kite Token", "type": "main", "index": 0 }]
+      ]
+    },
+    "Test Kite Token": {
+      "main": [[{ "node": "Token Valid?", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }],
+  "triggerCount": 1,
+  "active": false
+}

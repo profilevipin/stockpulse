@@ -1,0 +1,194 @@
+{
+  "name": "WF4d - Options & News Data",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "15 8 * * 1-5" }]
+        }
+      },
+      "id": "cron-815am",
+      "name": "8:15 AM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
+      },
+      "id": "get-symbols",
+      "name": "Get Symbols",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const symbols = $input.all().map(i => i.json.symbol);\n// Always include NIFTY for broad market options analysis\nconst allSymbols = ['NIFTY', ...symbols.filter(s => s !== 'NIFTY')];\nreturn [{ json: { symbols: allSymbols } }];"
+      },
+      "id": "add-nifty",
+      "name": "Add NIFTY to List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nse-data-service:5000/option-chain/NIFTY",
+        "options": {}
+      },
+      "id": "fetch-nifty-oc",
+      "name": "NSE: NIFTY Option Chain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze NIFTY option chain: PCR, Max Pain, Max OI strikes\nconst ocData = $input.first().json;\n\nif (!ocData || !ocData.records) {\n  return [{ json: { symbol: 'NIFTY', error: 'Option chain data unavailable' } }];\n}\n\nconst data = ocData.records.data || [];\nconst spotPrice = ocData.records.underlyingValue || 0;\n\nlet totalCallOI = 0, totalPutOI = 0;\nlet maxCallOI = 0, maxCallOIStrike = 0;\nlet maxPutOI = 0, maxPutOIStrike = 0;\nconst strikes = [];\n\nfor (const row of data) {\n  const strike = row.strikePrice;\n  const callOI = row.CE?.openInterest || 0;\n  const putOI = row.PE?.openInterest || 0;\n  const callIV = row.CE?.impliedVolatility || 0;\n  const putIV = row.PE?.impliedVolatility || 0;\n  \n  totalCallOI += callOI;\n  totalPutOI += putOI;\n  \n  if (callOI > maxCallOI) { maxCallOI = callOI; maxCallOIStrike = strike; }\n  if (putOI > maxPutOI) { maxPutOI = putOI; maxPutOIStrike = strike; }\n  \n  strikes.push({ strike, callOI, putOI, callIV, putIV });\n}\n\nconst pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : 0;\n\n// Max Pain calculation\nlet minPain = Infinity, maxPainStrike = 0;\nfor (const s of strikes) {\n  let pain = 0;\n  for (const other of strikes) {\n    if (other.strike < s.strike) pain += other.callOI * (s.strike - other.strike);\n    if (other.strike > s.strike) pain += other.putOI * (other.strike - s.strike);\n  }\n  if (pain < minPain) { minPain = pain; maxPainStrike = s.strike; }\n}\n\n// PCR interpretation\nlet pcrSignal = 'neutral';\nif (parseFloat(pcr) > 1.2) pcrSignal = 'bullish (heavy put writing = support)';\nelse if (parseFloat(pcr) < 0.8) pcrSignal = 'bearish (heavy call writing = resistance)';\n\nreturn [{\n  json: {\n    symbol: 'NIFTY',\n    spot_price: spotPrice,\n    pcr: parseFloat(pcr),\n    pcr_signal: pcrSignal,\n    max_pain: maxPainStrike,\n    max_call_oi_strike: maxCallOIStrike,\n    max_put_oi_strike: maxPutOIStrike,\n    expected_range: `${maxPutOIStrike} - ${maxCallOIStrike}`,\n    total_call_oi: totalCallOI,\n    total_put_oi: totalPutOI,\n    top_strikes: strikes.sort((a,b) => (b.callOI + b.putOI) - (a.callOI + a.putOI)).slice(0, 10)\n  }\n}];"
+      },
+      "id": "analyze-nifty-options",
+      "name": "Analyze NIFTY Options",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build NewsAPI request for all portfolio stocks\nconst symbols = $('Add NIFTY to List').first().json.symbols.filter(s => s !== 'NIFTY');\nconst query = symbols.slice(0, 10).join(' OR '); // NewsAPI limit\nreturn [{ json: { query: query, symbols: symbols } }];"
+      },
+      "id": "build-news-query",
+      "name": "Build News Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 450]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://newsapi.org/v2/everything?q=' + encodeURIComponent($json.query) + '&language=en&sortBy=publishedAt&pageSize=20&apiKey=' + $env.NEWSAPI_KEY }}",
+        "options": {}
+      },
+      "id": "fetch-news",
+      "name": "NewsAPI: Stock News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, system: 'You are a financial news sentiment analyzer for Indian stocks. Analyze the news articles and score sentiment for each stock mentioned. Return ONLY valid JSON array: [{ \"symbol\": \"STOCKNAME\", \"sentiment_score\": -100 to +100, \"key_headline\": \"most impactful headline\", \"impact\": \"brief description\", \"confidence\": 0 to 1 }]. Scoring: -100 to -60 very negative (fraud/crash), -60 to -20 negative (miss/downgrade), -20 to +20 neutral, +20 to +60 positive (beat/upgrade), +60 to +100 very positive (breakthrough/deal).', messages: [{ role: 'user', content: 'Analyze sentiment for these stocks: ' + $('Add NIFTY to List').first().json.symbols.join(', ') + '\\n\\nNews articles:\\n' + ($input.first().json.articles || []).slice(0, 15).map(a => a.title + ' - ' + a.description).join('\\n') }] }) }}"
+      },
+      "id": "claude-sentiment",
+      "name": "Claude: Sentiment Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 450],
+      "credentials": {
+        "httpHeaderAuth": { "id": "CLAUDE_CREDENTIAL_ID", "name": "Claude API" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://nse-data-service:5000/corporate-actions",
+        "options": {}
+      },
+      "id": "fetch-corporate-actions",
+      "name": "NSE: Corporate Actions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 650]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all data: options + news sentiment + corporate actions\nconst niftyOptions = $('Analyze NIFTY Options').first().json;\nconst sentimentResponse = $('Claude: Sentiment Score').first().json;\nconst corporateActions = $('NSE: Corporate Actions').first().json;\nconst newsArticles = $('NewsAPI: Stock News').first().json;\n\n// Parse sentiment\nlet sentiment = [];\ntry {\n  const text = sentimentResponse.content\n    .filter(c => c.type === 'text').map(c => c.text).join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  sentiment = JSON.parse(clean);\n} catch (e) {\n  sentiment = [{ parse_error: e.message }];\n}\n\nconst dateStr = new Date().toISOString().split('T')[0];\n\nconst combinedData = {\n  nifty_options: niftyOptions,\n  news_sentiment: sentiment,\n  corporate_actions: corporateActions,\n  news_articles: (newsArticles.articles || []).slice(0, 10).map(a => ({\n    title: a.title,\n    source: a.source?.name,\n    publishedAt: a.publishedAt\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: dateStr } }];"
+      },
+      "id": "combine-options-news",
+      "name": "Combine Options & News",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 400]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'options_news', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.date, JSON.stringify($json.data)] }}"
+          }
+        }
+      },
+      "id": "store-options-news",
+      "name": "Store in Staging",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1760, 400],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    }
+  ],
+  "connections": {
+    "8:15 AM Mon-Fri": {
+      "main": [[{ "node": "Get Symbols", "type": "main", "index": 0 }]]
+    },
+    "Get Symbols": {
+      "main": [[{ "node": "Add NIFTY to List", "type": "main", "index": 0 }]]
+    },
+    "Add NIFTY to List": {
+      "main": [
+        [
+          { "node": "NSE: NIFTY Option Chain", "type": "main", "index": 0 },
+          { "node": "Build News Query", "type": "main", "index": 0 },
+          { "node": "NSE: Corporate Actions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "NSE: NIFTY Option Chain": {
+      "main": [[{ "node": "Analyze NIFTY Options", "type": "main", "index": 0 }]]
+    },
+    "Analyze NIFTY Options": {
+      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+    },
+    "Build News Query": {
+      "main": [[{ "node": "NewsAPI: Stock News", "type": "main", "index": 0 }]]
+    },
+    "NewsAPI: Stock News": {
+      "main": [[{ "node": "Claude: Sentiment Score", "type": "main", "index": 0 }]]
+    },
+    "Claude: Sentiment Score": {
+      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+    },
+    "NSE: Corporate Actions": {
+      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+    },
+    "Combine Options & News": {
+      "main": [[{ "node": "Store in Staging", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "triggerCount": 1,
+  "active": false
+}

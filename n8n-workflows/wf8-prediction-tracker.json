@@ -1,0 +1,169 @@
+{
+  "name": "WF8 - Prediction Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "46 15 * * 1-5" }]
+        }
+      },
+      "id": "cron-346pm",
+      "name": "3:46 PM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT p.id, p.user_id, p.symbol, p.target_price, p.current_price_at_prediction, p.direction, p.predicted_probability, p.predicted_timeframe_min, p.predicted_timeframe_max, p.created_at, u.alerts_chat_id, u.private_chat_id FROM predictions p JOIN users u ON p.user_id = u.id WHERE p.status = 'pending' AND u.is_active = true"
+      },
+      "id": "get-pending-predictions",
+      "name": "Get Pending Predictions",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-predictions",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": "0",
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "any-pending",
+      "name": "Any Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build batch Kite quote request for prediction symbols\nconst predictions = $input.all().map(i => i.json);\nconst uniqueSymbols = [...new Set(predictions.map(p => `NSE:${p.symbol}`))];\nconst queryParams = uniqueSymbols.map(s => `i=${s}`).join('&');\n\nreturn [{\n  json: {\n    predictions: predictions,\n    quote_url: `https://api.kite.trade/quote?${queryParams}`\n  }\n}];"
+      },
+      "id": "build-quote-url",
+      "name": "Build Quote URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.quote_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Kite-Version", "value": "3" }]
+        }
+      },
+      "id": "kite-quotes",
+      "name": "Kite: Get Quotes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 200],
+      "credentials": {
+        "httpHeaderAuth": { "id": "KITE_CREDENTIAL_ID", "name": "Kite Connect" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check each prediction against current prices\nconst quotes = $input.first().json.data || {};\nconst predictions = $('Build Quote URL').item.json.predictions;\nconst updates = [];\n\nfor (const pred of predictions) {\n  const key = `NSE:${pred.symbol}`;\n  const quote = quotes[key];\n  if (!quote) continue;\n\n  const currentPrice = quote.last_price;\n  const targetPrice = parseFloat(pred.target_price);\n  const predictionPrice = parseFloat(pred.current_price_at_prediction);\n  const createdAt = new Date(pred.created_at);\n  const now = new Date();\n  \n  // Calculate trading sessions elapsed (approximate: weekdays)\n  const msElapsed = now - createdAt;\n  const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);\n  const sessionsElapsed = Math.floor(daysElapsed * 5 / 7); // Rough weekday count\n\n  let status = 'pending';\n  let hit = false;\n  let accuracyScore = null;\n\n  // Check if target hit\n  if (pred.direction === 'UP' && currentPrice >= targetPrice) {\n    status = 'hit';\n    hit = true;\n    // Accuracy: how close was our timeline prediction?\n    const predictedAvg = (pred.predicted_timeframe_min + pred.predicted_timeframe_max) / 2;\n    const timelineError = Math.abs(sessionsElapsed - predictedAvg);\n    accuracyScore = Math.max(0, 100 - timelineError * 10);\n  } else if (pred.direction === 'DOWN' && currentPrice <= targetPrice) {\n    status = 'hit';\n    hit = true;\n    const predictedAvg = (pred.predicted_timeframe_min + pred.predicted_timeframe_max) / 2;\n    const timelineError = Math.abs(sessionsElapsed - predictedAvg);\n    accuracyScore = Math.max(0, 100 - timelineError * 10);\n  }\n\n  // Check if expired (past max timeframe)\n  if (!hit && sessionsElapsed > pred.predicted_timeframe_max) {\n    // Check if direction was at least correct\n    const directionCorrect = \n      (pred.direction === 'UP' && currentPrice > predictionPrice) ||\n      (pred.direction === 'DOWN' && currentPrice < predictionPrice);\n    \n    status = 'expired';\n    accuracyScore = directionCorrect ? 30 : 0; // Partial credit for direction\n  }\n\n  if (status !== 'pending') {\n    updates.push({\n      prediction_id: pred.id,\n      user_id: pred.user_id,\n      symbol: pred.symbol,\n      status: status,\n      actual_hit: hit,\n      actual_sessions_taken: sessionsElapsed,\n      accuracy_score: accuracyScore,\n      current_price: currentPrice,\n      target_price: targetPrice,\n      direction: pred.direction,\n      chat_id: pred.alerts_chat_id || pred.private_chat_id\n    });\n  }\n}\n\nreturn updates.map(u => ({ json: u }));"
+      },
+      "id": "evaluate-predictions",
+      "name": "Evaluate Predictions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "query": "UPDATE predictions SET status = $1, actual_hit = $2, actual_hit_date = CASE WHEN $2 THEN NOW() ELSE NULL END, actual_sessions_taken = $3, accuracy_score = $4 WHERE id = $5",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.status, $json.actual_hit, $json.actual_sessions_taken, $json.accuracy_score, $json.prediction_id] }}"
+          }
+        }
+      },
+      "id": "update-prediction",
+      "name": "Update Prediction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1540, 200],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format notification for resolved prediction\nconst p = $('Evaluate Predictions').item.json;\nconst emoji = p.actual_hit ? '✅' : '❌';\nconst hitText = p.actual_hit ? 'TARGET HIT!' : 'Prediction expired';\n\nconst msg = `${emoji} *Prediction Update: ${p.symbol}*\\n\\n` +\n  `Direction: ${p.direction} | Target: ₹${p.target_price}\\n` +\n  `Current: ₹${p.current_price}\\n` +\n  `Sessions taken: ${p.actual_sessions_taken}\\n` +\n  `Result: *${hitText}*\\n` +\n  `Accuracy score: ${p.accuracy_score}/100`;\n\nreturn [{ json: { chat_id: p.chat_id, message: msg } }];"
+      },
+      "id": "format-update",
+      "name": "Format Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-prediction-update",
+      "name": "Send Update",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1980, 200],
+      "credentials": {
+        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "3:46 PM Mon-Fri": {
+      "main": [[{ "node": "Get Pending Predictions", "type": "main", "index": 0 }]]
+    },
+    "Get Pending Predictions": {
+      "main": [[{ "node": "Any Pending?", "type": "main", "index": 0 }]]
+    },
+    "Any Pending?": {
+      "main": [
+        [{ "node": "Build Quote URL", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build Quote URL": {
+      "main": [[{ "node": "Kite: Get Quotes", "type": "main", "index": 0 }]]
+    },
+    "Kite: Get Quotes": {
+      "main": [[{ "node": "Evaluate Predictions", "type": "main", "index": 0 }]]
+    },
+    "Evaluate Predictions": {
+      "main": [[{ "node": "Update Prediction", "type": "main", "index": 0 }]]
+    },
+    "Update Prediction": {
+      "main": [[{ "node": "Format Update", "type": "main", "index": 0 }]]
+    },
+    "Format Update": {
+      "main": [[{ "node": "Send Update", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }],
+  "triggerCount": 1,
+  "active": false
+}

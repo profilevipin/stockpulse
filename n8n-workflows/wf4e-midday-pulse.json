@@ -1,0 +1,141 @@
+{
+  "name": "WF4e - Midday Pulse",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "30 12 * * 1-5" }]
+        }
+      },
+      "id": "cron-1230pm",
+      "name": "12:30 PM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Market hours check\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\nconst day = ist.getDay();\nif (day === 0 || day === 6) return [];\nreturn [{ json: { date: ist.toISOString().split('T')[0] } }];"
+      },
+      "id": "market-check",
+      "name": "Market Open?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id, u.settings FROM users u WHERE u.is_active = true AND (u.settings->>'midday_pulse_enabled')::boolean IS NOT false"
+      },
+      "id": "get-users",
+      "name": "Get Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [660, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
+      },
+      "id": "get-all-symbols",
+      "name": "Get All Symbols",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [660, 500],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build batch Kite quote URL for all symbols + NIFTY\nconst symbols = $('Get All Symbols').all().map(i => i.json.symbol);\nconst allSymbols = ['NSE:NIFTY 50', ...symbols.map(s => `NSE:${s}`)];\nconst queryParams = allSymbols.map(s => `i=${encodeURIComponent(s)}`).join('&');\nreturn [{ json: { quote_url: `https://api.kite.trade/quote?${queryParams}`, symbols } }];"
+      },
+      "id": "build-quote-url",
+      "name": "Build Quote URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.quote_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Kite-Version", "value": "3" }]
+        },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "kite-quotes",
+      "name": "Kite: Batch Quotes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 400],
+      "credentials": {
+        "httpHeaderAuth": { "id": "KITE_CREDENTIAL_ID", "name": "Kite Connect" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build midday pulse per user — NO Claude, just template\nconst quotes = $input.first().json.data || {};\nconst users = $('Get Users').all().map(i => i.json);\nconst messages = [];\n\n// NIFTY data\nconst niftyQuote = quotes['NSE:NIFTY 50'] || {};\nconst niftyPrice = niftyQuote.last_price || 0;\nconst niftyChange = niftyQuote.net_change || 0;\nconst niftyPct = niftyPrice > 0 ? ((niftyChange / (niftyPrice - niftyChange)) * 100).toFixed(1) : '?';\nconst niftyEmoji = parseFloat(niftyPct) >= 0 ? '🟢' : '🔴';\n\nfor (const user of users) {\n  // Get this user's holdings P&L\n  // In production: query holdings view + match with quotes\n  // For now, calculate from all symbols\n  let totalInvested = 0, totalCurrent = 0;\n  let closestAlert = null, closestDist = 999;\n  \n  // Template message — 3 lines max\n  const line1 = `${niftyEmoji} NIFTY: ${niftyPrice.toLocaleString()} (${parseFloat(niftyPct) >= 0 ? '+' : ''}${niftyPct}%)`;\n  \n  // Line 2: Portfolio P&L (simplified — in production, compute from actual holdings)\n  const line2 = `Your portfolio: computing...`; // Replace with actual P&L calc\n  \n  // Line 3: Closest alert\n  const line3 = closestAlert \n    ? `🔔 ${closestAlert.symbol} ${closestDist.toFixed(1)}% from target`\n    : `🔔 All alerts within range`;\n  \n  const msg = `⏸️ *Midday Pulse* — 12:30 PM\\n${line1}\\n${line2}\\n${line3}`;\n  \n  messages.push({\n    chat_id: user.alerts_chat_id || user.private_chat_id,\n    text: msg\n  });\n}\n\nreturn messages.map(m => ({ json: m }));"
+      },
+      "id": "build-pulse",
+      "name": "Build Midday Pulse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-pulse",
+      "name": "Send Pulse",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 400],
+      "credentials": {
+        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "12:30 PM Mon-Fri": {
+      "main": [[{ "node": "Market Open?", "type": "main", "index": 0 }]]
+    },
+    "Market Open?": {
+      "main": [[
+        { "node": "Get Users", "type": "main", "index": 0 },
+        { "node": "Get All Symbols", "type": "main", "index": 0 }
+      ]]
+    },
+    "Get Users": {
+      "main": [[{ "node": "Build Quote URL", "type": "main", "index": 0 }]]
+    },
+    "Get All Symbols": {
+      "main": [[{ "node": "Build Quote URL", "type": "main", "index": 0 }]]
+    },
+    "Build Quote URL": {
+      "main": [[{ "node": "Kite: Batch Quotes", "type": "main", "index": 0 }]]
+    },
+    "Kite: Batch Quotes": {
+      "main": [[{ "node": "Build Midday Pulse", "type": "main", "index": 0 }]]
+    },
+    "Build Midday Pulse": {
+      "main": [[{ "node": "Send Pulse", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }],
+  "triggerCount": 1,
+  "active": false
+}

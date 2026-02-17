@@ -1,0 +1,128 @@
+{
+  "name": "WF5 - EOD Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "45 15 * * 1-5" }]
+        }
+      },
+      "id": "cron-345pm",
+      "name": "3:45 PM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id FROM users u WHERE u.is_active = true"
+      },
+      "id": "get-users",
+      "name": "Get Active Users",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// For each user, gather today's activity\nconst users = $input.all().map(i => i.json);\nconst results = [];\n\nfor (const user of users) {\n  // In production, these would be separate PostgreSQL queries:\n  // 1. Today's trades for this user\n  // 2. Alerts triggered today for this user\n  // 3. Current holdings + live prices\n  // 4. Patterns detected today\n  // 5. Prediction status updates\n  \n  results.push({\n    user_id: user.user_id,\n    chat_id: user.alerts_chat_id || user.private_chat_id,\n    display_name: user.display_name\n  });\n}\n\nreturn results.map(r => ({ json: r }));"
+      },
+      "id": "gather-day-data",
+      "name": "Gather Day Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested FROM holdings h WHERE h.user_id = $1 AND h.net_quantity > 0",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.user_id] }}"
+          }
+        }
+      },
+      "id": "get-user-holdings",
+      "name": "Get User Holdings",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [880, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build EOD summary with live closing prices\n// In production: fetch closing prices from Kite, calculate day P&L\nconst holdings = $input.all().map(i => i.json);\nconst user = $('Gather Day Data').item.json;\n\nif (holdings.length === 0) {\n  return [{\n    json: {\n      chat_id: user.chat_id,\n      message: `📊 *EOD Summary — ${user.display_name}*\\n\\nNo holdings to report. Add trades to start tracking!`\n    }\n  }];\n}\n\n// Template message — in production, fill with actual closing prices\nconst msg = `🔔 *End of Day Summary*\\n` +\n  `📅 ${new Date().toISOString().split('T')[0]}\\n\\n` +\n  `📊 *Portfolio: ${holdings.length} stocks*\\n` +\n  holdings.map(h => \n    `• ${h.symbol}: ${h.net_quantity} shares @ ₹${h.avg_buy_price}`\n  ).join('\\n') +\n  `\\n\\n💡 _Closing prices will be fetched from Kite API_\\n` +\n  `\\n⚠️ Technical analysis only. Not financial advice.`;\n\nreturn [{ json: { chat_id: user.chat_id, message: msg } }];"
+      },
+      "id": "build-eod-summary",
+      "name": "Build EOD Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "query": "INSERT INTO daily_snapshots (user_id, snapshot_date, portfolio_value, total_pnl, day_pnl, holdings_detail) VALUES ($1, CURRENT_DATE, $2, $3, $4, $5) ON CONFLICT (user_id, snapshot_date) DO UPDATE SET portfolio_value = $2, total_pnl = $3, day_pnl = $4, holdings_detail = $5",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$('Gather Day Data').item.json.user_id, 0, 0, 0, '{}'] }}"
+          }
+        }
+      },
+      "id": "save-snapshot",
+      "name": "Save Daily Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1320, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Build EOD Summary').item.json.chat_id }}",
+        "text": "={{ $('Build EOD Summary').item.json.message }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-eod",
+      "name": "Send EOD Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 300],
+      "credentials": {
+        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "3:45 PM Mon-Fri": {
+      "main": [[{ "node": "Get Active Users", "type": "main", "index": 0 }]]
+    },
+    "Get Active Users": {
+      "main": [[{ "node": "Gather Day Data", "type": "main", "index": 0 }]]
+    },
+    "Gather Day Data": {
+      "main": [[{ "node": "Get User Holdings", "type": "main", "index": 0 }]]
+    },
+    "Get User Holdings": {
+      "main": [[{ "node": "Build EOD Summary", "type": "main", "index": 0 }]]
+    },
+    "Build EOD Summary": {
+      "main": [[{ "node": "Save Daily Snapshot", "type": "main", "index": 0 }]]
+    },
+    "Save Daily Snapshot": {
+      "main": [[{ "node": "Send EOD Summary", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }],
+  "triggerCount": 1,
+  "active": false
+}

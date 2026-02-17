@@ -1,0 +1,130 @@
+{
+  "name": "WF4c - Technical Data Calculator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
+        }
+      },
+      "id": "cron-8am",
+      "name": "8:00 AM Mon-Fri",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
+      },
+      "id": "get-all-symbols",
+      "name": "Get All Symbols",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// For each symbol, build Kite historical data URL (90 days)\nconst symbols = $input.all().map(i => i.json.symbol);\nconst now = new Date();\nconst from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);\nconst fromStr = from.toISOString().split('T')[0];\nconst toStr = now.toISOString().split('T')[0];\n\n// Return list for Split In Batches node\nreturn symbols.map(s => ({\n  json: {\n    symbol: s,\n    url: `https://api.kite.trade/instruments/historical/NSE:${s}/day?from=${fromStr}+09:15:00&to=${toStr}+15:30:00`\n  }\n}));"
+      },
+      "id": "build-historical-urls",
+      "name": "Build Historical URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Process Each Symbol",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "X-Kite-Version", "value": "3" }]
+        }
+      },
+      "id": "kite-historical",
+      "name": "Kite: Historical OHLC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "credentials": {
+        "httpHeaderAuth": { "id": "KITE_CREDENTIAL_ID", "name": "Kite Connect" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// FULL TECHNICAL ANALYSIS ENGINE\n// Calculates: SMA, EMA, RSI, MACD, Bollinger, ATR, Support/Resistance, Volume Analysis, Momentum Score\n\nconst symbol = $('Process Each Symbol').item.json.symbol;\nconst kiteResponse = $input.first().json;\nconst candles = kiteResponse.data?.candles || [];\n\nif (candles.length < 30) {\n  return [{ json: { symbol, error: 'Insufficient data', candle_count: candles.length } }];\n}\n\n// Parse candle data: [date, open, high, low, close, volume]\nconst dates = candles.map(c => c[0]);\nconst opens = candles.map(c => c[1]);\nconst highs = candles.map(c => c[2]);\nconst lows = candles.map(c => c[3]);\nconst closes = candles.map(c => c[4]);\nconst volumes = candles.map(c => c[5]);\n\n// ===== MOVING AVERAGES =====\nfunction sma(data, period) {\n  if (data.length < period) return null;\n  return data.slice(-period).reduce((a, b) => a + b, 0) / period;\n}\n\nfunction ema(data, period) {\n  if (data.length < period) return null;\n  const k = 2 / (period + 1);\n  let ema = data.slice(0, period).reduce((a, b) => a + b, 0) / period;\n  for (let i = period; i < data.length; i++) {\n    ema = data[i] * k + ema * (1 - k);\n  }\n  return ema;\n}\n\nconst sma5 = sma(closes, 5);\nconst sma10 = sma(closes, 10);\nconst sma20 = sma(closes, 20);\nconst sma50 = sma(closes, 50);\nconst sma200 = closes.length >= 200 ? sma(closes, 200) : null;\nconst ema9 = ema(closes, 9);\nconst ema12 = ema(closes, 12);\nconst ema21 = ema(closes, 21);\nconst ema26 = ema(closes, 26);\n\n// ===== RSI (Wilder's Smoothing) =====\nfunction calcRSI(data, period = 14) {\n  if (data.length < period + 1) return null;\n  let gains = 0, losses = 0;\n  for (let i = 1; i <= period; i++) {\n    const diff = data[i] - data[i-1];\n    if (diff > 0) gains += diff; else losses += Math.abs(diff);\n  }\n  let avgGain = gains / period;\n  let avgLoss = losses / period;\n  for (let i = period + 1; i < data.length; i++) {\n    const diff = data[i] - data[i-1];\n    avgGain = (avgGain * (period - 1) + Math.max(diff, 0)) / period;\n    avgLoss = (avgLoss * (period - 1) + Math.max(-diff, 0)) / period;\n  }\n  if (avgLoss === 0) return 100;\n  return 100 - (100 / (1 + avgGain / avgLoss));\n}\nconst rsi14 = calcRSI(closes);\n\n// ===== MACD =====\nconst macdLine = ema12 && ema26 ? ema12 - ema26 : null;\n// Signal line approximation\nconst macdValues = [];\nif (closes.length >= 26) {\n  const k12 = 2/13, k26 = 2/27;\n  let e12 = closes.slice(0,12).reduce((a,b)=>a+b,0)/12;\n  let e26 = closes.slice(0,26).reduce((a,b)=>a+b,0)/26;\n  for (let i = 26; i < closes.length; i++) {\n    e12 = closes[i]*k12 + e12*(1-k12);\n    e26 = closes[i]*k26 + e26*(1-k26);\n    macdValues.push(e12 - e26);\n  }\n}\nconst signalLine = macdValues.length >= 9 ? ema(macdValues, 9) : null;\nconst macdHistogram = macdLine && signalLine ? macdLine - signalLine : null;\n\n// ===== BOLLINGER BANDS =====\nfunction calcBollinger(data, period = 20, mult = 2) {\n  if (data.length < period) return null;\n  const slice = data.slice(-period);\n  const mean = slice.reduce((a, b) => a + b, 0) / period;\n  const stdDev = Math.sqrt(slice.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / period);\n  const price = data[data.length - 1];\n  return {\n    upper: mean + mult * stdDev,\n    middle: mean,\n    lower: mean - mult * stdDev,\n    bandwidth: stdDev > 0 ? (4 * mult * stdDev / mean * 100) : 0,\n    percentB: stdDev > 0 ? (price - (mean - mult * stdDev)) / (2 * mult * stdDev) : 0.5\n  };\n}\nconst bb = calcBollinger(closes);\n\n// ===== ATR (14-period) =====\nfunction calcATR(highs, lows, closes, period = 14) {\n  if (highs.length < period + 1) return null;\n  const trs = [];\n  for (let i = 1; i < highs.length; i++) {\n    trs.push(Math.max(\n      highs[i] - lows[i],\n      Math.abs(highs[i] - closes[i-1]),\n      Math.abs(lows[i] - closes[i-1])\n    ));\n  }\n  let atr = trs.slice(0, period).reduce((a,b) => a+b, 0) / period;\n  for (let i = period; i < trs.length; i++) {\n    atr = (atr * (period - 1) + trs[i]) / period;\n  }\n  return atr;\n}\nconst atr14 = calcATR(highs, lows, closes);\n\n// ===== SUPPORT & RESISTANCE =====\nconst lastClose = closes[closes.length - 1];\nconst lastHigh = highs[highs.length - 1];\nconst lastLow = lows[lows.length - 1];\nconst pivot = (lastHigh + lastLow + lastClose) / 3;\nconst r1 = 2 * pivot - lastLow;\nconst s1 = 2 * pivot - lastHigh;\nconst r2 = pivot + (lastHigh - lastLow);\nconst s2 = pivot - (lastHigh - lastLow);\nconst high20 = Math.max(...highs.slice(-20));\nconst low20 = Math.min(...lows.slice(-20));\n\n// ===== VOLUME ANALYSIS =====\nconst currentVol = volumes[volumes.length - 1];\nconst avgVol5 = sma(volumes, 5);\nconst avgVol20 = sma(volumes, 20);\nconst volRatio = avgVol20 ? currentVol / avgVol20 : 1;\n\n// OBV trend (last 10 days)\nlet obv = 0;\nconst obvValues = [0];\nfor (let i = 1; i < closes.length; i++) {\n  if (closes[i] > closes[i-1]) obv += volumes[i];\n  else if (closes[i] < closes[i-1]) obv -= volumes[i];\n  obvValues.push(obv);\n}\nconst obvTrend = obvValues.length >= 10 \n  ? (obvValues[obvValues.length-1] > obvValues[obvValues.length-10] ? 'rising' : 'falling')\n  : 'neutral';\n\n// ===== TREND CLASSIFICATION =====\nlet trend = 'SIDEWAYS';\nif (lastClose > (sma50 || 0) && lastClose > (sma20 || 0) && (sma20 || 0) > (sma50 || 0)) {\n  trend = rsi14 > 60 ? 'STRONG_BULLISH' : 'BULLISH';\n} else if (lastClose < (sma50 || Infinity) && lastClose < (sma20 || Infinity)) {\n  trend = rsi14 < 40 ? 'STRONG_BEARISH' : 'BEARISH';\n}\n\n// ===== MOMENTUM SCORE (0-100) =====\nlet momentum = 50;\nif (rsi14) momentum += (rsi14 - 50) * 0.3;\nif (macdHistogram) momentum += (macdHistogram > 0 ? 10 : -10);\nif (lastClose > (sma20 || 0)) momentum += 5;\nif (lastClose > (sma50 || 0)) momentum += 5;\nif (obvTrend === 'rising') momentum += 5;\nelse if (obvTrend === 'falling') momentum -= 5;\nmomentum = Math.max(0, Math.min(100, momentum));\n\n// ===== AVERAGE DAILY MOVE =====\nconst dailyMoves = [];\nfor (let i = Math.max(1, closes.length - 20); i < closes.length; i++) {\n  dailyMoves.push(Math.abs(closes[i] - closes[i-1]) / closes[i-1] * 100);\n}\nconst avgDailyMove = dailyMoves.length > 0 \n  ? dailyMoves.reduce((a,b) => a+b, 0) / dailyMoves.length : 0;\n\nreturn [{\n  json: {\n    symbol: symbol,\n    last_close: lastClose,\n    candle_count: candles.length,\n    moving_averages: {\n      sma5, sma10, sma20, sma50, sma200,\n      ema9, ema12, ema21, ema26\n    },\n    rsi: rsi14,\n    macd: { line: macdLine, signal: signalLine, histogram: macdHistogram },\n    bollinger: bb,\n    atr: atr14,\n    support_resistance: { pivot, r1, r2, s1, s2, high20, low20 },\n    volume: {\n      current: currentVol,\n      avg_5d: avgVol5,\n      avg_20d: avgVol20,\n      ratio: volRatio,\n      obv_trend: obvTrend\n    },\n    trend: trend,\n    momentum_score: Math.round(momentum),\n    avg_daily_move_pct: avgDailyMove.toFixed(2),\n    calculated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "calculate-technicals",
+      "name": "Calculate Full Technicals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "query": "INSERT INTO staging_data (data_date, data_type, symbol, data) VALUES ($1, 'technicals', $2, $3) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $3, updated_at = NOW()",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [new Date().toISOString().split('T')[0], $json.symbol, JSON.stringify($json)] }}"
+          }
+        }
+      },
+      "id": "store-technicals",
+      "name": "Store Technicals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1540, 300],
+      "credentials": {
+        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+      }
+    }
+  ],
+  "connections": {
+    "8:00 AM Mon-Fri": {
+      "main": [[{ "node": "Get All Symbols", "type": "main", "index": 0 }]]
+    },
+    "Get All Symbols": {
+      "main": [[{ "node": "Build Historical URLs", "type": "main", "index": 0 }]]
+    },
+    "Build Historical URLs": {
+      "main": [[{ "node": "Process Each Symbol", "type": "main", "index": 0 }]]
+    },
+    "Process Each Symbol": {
+      "main": [
+        [{ "node": "Kite: Historical OHLC", "type": "main", "index": 0 }]
+      ]
+    },
+    "Kite: Historical OHLC": {
+      "main": [[{ "node": "Calculate Full Technicals", "type": "main", "index": 0 }]]
+    },
+    "Calculate Full Technicals": {
+      "main": [[{ "node": "Store Technicals", "type": "main", "index": 0 }]]
+    },
+    "Store Technicals": {
+      "main": [[{ "node": "Process Each Symbol", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "triggerCount": 1,
+  "active": false
+}
