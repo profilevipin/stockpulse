@@ -1,0 +1,26 @@
+# Environment and secrets
+.env
+.env.local
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs and backups
+*.log
+backups/
+*.sql.gz
+
+# Node / Python
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
