@@ -166,7 +166,8 @@
         "chatId": "={{ $('Assemble Weekly Context').item.json.chat_id }}",
         "text": "={{ $input.first().json.content.filter(c => c.type === 'text').map(c => c.text).join('') }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "send-weekly",

@@ -118,7 +118,8 @@
         "chatId": "={{ $('Build EOD Summary').item.json.chat_id }}",
         "text": "={{ $('Build EOD Summary').item.json.message }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "send-eod",

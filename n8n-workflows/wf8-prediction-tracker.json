@@ -170,7 +170,8 @@
         "chatId": "={{ $json.chat_id }}",
         "text": "={{ $json.message }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "send-prediction-update",

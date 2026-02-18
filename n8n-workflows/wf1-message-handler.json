@@ -96,7 +96,8 @@
         "chatId": "={{ $('Extract Message Data').item.json.chat_id }}",
         "text": "\u26d4 Unauthorized. You are not registered to use StockPulse.\n\nContact the admin to get access.",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "reject-unauthorized",
@@ -510,7 +511,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "={{ '\u2705 *BUY Logged*\\n\\n' + '\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + '   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n' + '   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n' + '   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price).toLocaleString() + '\\n\\n' + '\ud83d\udca1 Set a price alert: `alert ' + $('Parse Claude Response').item.json.symbol + ' LOWER-UPPER`' }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "confirm-buy",
@@ -617,7 +619,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "={{ $json.message }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "send-portfolio",
@@ -640,7 +643,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 view holdings + P&L\n`sync` \u2014 sync from Kite (User 1 only)\n\n\ud83d\udd2e *Analysis*\n`predict RELIANCE 3000`\n`when will TCS hit 4000`\n`briefing` \u2014 morning analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "handle-help",
@@ -663,7 +667,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "={{ '\ud83e\udd14 I didn\\'t quite understand that.\\n\\nYou said: \"' + $('Prepare User Context').item.json.message_text + '\"\\n\\nTry one of these:\\n\u2022 `buy RELIANCE 10 at 2850`\\n\u2022 `alert INFY 1400-1500`\\n\u2022 `portfolio`\\n\u2022 `help` for all commands' }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "handle-unknown",
@@ -696,33 +701,32 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $(\"Parse Claude Response\").item.json.chat_id }}",
-        "text": "={{ '\ud83d\udd2e *Price Prediction*\\n\\n' + ($(\"Parse Claude Response\").item.json.symbol ? 'Symbol: *' + $(\"Parse Claude Response\").item.json.symbol + '*\\n' : '') + ($(\"Parse Claude Response\").item.json.upper_bound ? 'Target: \u20b9' + $(\"Parse Claude Response\").item.json.upper_bound + '\\n\\n' : '\\n') + 'Prediction analysis is generated in your morning briefing at 8:30 AM with technical levels, options data, and AI-driven scenarios.\\n\\nFor quick technicals, check the morning briefing or wait for the next scheduled analysis.' }}",
-        "additionalFields": {
-          "parse_mode": "Markdown"
-        }
+        "operation": "executeQuery",
+        "query": "SELECT access_token_encrypted, token_expiry > NOW() as is_valid FROM kite_sessions WHERE user_id = (SELECT id FROM users WHERE is_kite_provider = true LIMIT 1) LIMIT 1"
       },
       "id": "handle-predict",
-      "name": "Handle PREDICT",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
+      "name": "Get Quote Token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
       "position": [
         2460,
         400
       ],
       "credentials": {
-        "telegramApi": {
-          "id": "oh2jj2bRbyNVQvgB",
-          "name": "Telegram account"
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
         "chatId": "={{ $(\"Parse Claude Response\").item.json.chat_id }}",
         "text": "\ud83d\udccb *Morning Briefing*\n\nThe morning briefing is sent automatically at *8:30 AM* (IST) every trading day.\n\nIt includes:\n\u2022 Global market cues (SGX Nifty, US markets)\n\u2022 FII/DII activity\n\u2022 Technical analysis for your stocks\n\u2022 Options data & sentiment\n\u2022 Top 5 stocks by attention score\n\nIf you missed today's briefing, it will arrive tomorrow morning.",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "handle-briefing",
@@ -767,7 +771,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const alerts = $input.all().map(i => i.json);\nconst chatId = $(\"Parse Claude Response\").first().json.chat_id;\n\nif (alerts.length === 0 || !alerts[0].id) {\n  return [{ json: { chat_id: chatId, message: '\ud83d\udced *No active alerts*\\n\\nSet one with:\\n`alert RELIANCE 2800-2950`' } }];\n}\n\nlet msg = '\ud83d\udd14 *Your Active Alerts*\\n\\n';\nfor (const a of alerts) {\n  const bounds = [];\n  if (a.lower_bound) bounds.push('\u2b07\ufe0f \u20b9' + a.lower_bound);\n  if (a.upper_bound) bounds.push('\u2b06\ufe0f \u20b9' + a.upper_bound);\n  const status = a.status === 'cooldown' ? ' _(cooldown)_' : '';\n  msg += '\u2022 *' + a.symbol + '* \u2014 ' + bounds.join(' / ') + status + '\\n';\n}\nmsg += '\\n_' + alerts.length + ' alert(s) active_\\n\\nCancel with: `cancel alert SYMBOL`';\n\nreturn [{ json: { chat_id: chatId, message: msg } }];"
+        "jsCode": "const alerts = $input.all()\n  .map(i => i.json)\n  .filter(a => a.id !== undefined && a.id !== null);  // filter out empty rows from alwaysOutputData\n\nconst chatId = $(\"Parse Claude Response\").first().json.chat_id;\n\nif (alerts.length === 0) {\n  return [{ json: { chat_id: chatId, message: \"\ud83d\udced *No active alerts*\\n\\nSet one with:\\n`alert RELIANCE 2800-2950`\" } }];\n}\n\nlet msg = \"\ud83d\udd14 *Your Active Alerts*\\n\\n\";\nfor (const a of alerts) {\n  const bounds = [];\n  if (a.lower_bound) bounds.push(\"\u2b07\ufe0f \u20b9\" + a.lower_bound);\n  if (a.upper_bound) bounds.push(\"\u2b06\ufe0f \u20b9\" + a.upper_bound);\n  const status = a.status === \"cooldown\" ? \" _(cooldown)_\" : \"\";\n  msg += \"\u2022 *\" + a.symbol + \"* \u2014 \" + bounds.join(\" / \") + status + \"\\n\";\n}\nmsg += \"\\n_\" + alerts.length + \" alert(s) active_\\n\\nCancel with: `cancel alert SYMBOL`\";\n\nreturn [{ json: { chat_id: chatId, message: msg } }];"
       },
       "id": "format-alerts-list",
       "name": "Format Alerts List",
@@ -781,9 +785,10 @@
     {
       "parameters": {
         "chatId": "={{ $(\"Parse Claude Response\").item.json.chat_id }}",
-        "text": "={{ $(\"Parse Claude Response\").item.json.message }}",
+        "text": "={{ $json.message }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "send-alerts-list",
@@ -842,7 +847,8 @@
         "chatId": "={{ $('Prepare Alert Cancel').first().json.chat_id }}",
         "text": "={{ $input.all().length > 0 ? '\u2705 Alert for *' + $('Prepare Alert Cancel').first().json.symbol + '* cancelled.' : '\u26a0\ufe0f No active alert found for *' + $('Prepare Alert Cancel').first().json.symbol + '*.' }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "confirm-alert-cancel",
@@ -862,33 +868,25 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $(\"Parse Claude Response\").item.json.chat_id }}",
-        "text": "={{ $(\"Parse Claude Response\").item.json.request_token ? '\ud83d\udd11 Processing Kite login with token: `' + $(\"Parse Claude Response\").item.json.request_token + '`\\n\\nPlease wait while we validate your session...' : '\ud83d\udd11 *Kite Connect Login*\\n\\n1. Click the login link sent by the Token Manager (WF6) at 8:45 AM\\n2. Login to Zerodha\\n3. Copy the `request_token` from the redirect URL\\n4. Send: `login YOUR_TOKEN_HERE`' }}",
-        "additionalFields": {
-          "parse_mode": "Markdown"
-        }
+        "jsCode": "// Process login token from user\nconst intent_data = $(\"Parse Claude Response\").first().json;\nconst raw_token = intent_data.request_token || \"\";\nconst ctx = intent_data;\n\n// Handle two formats:\n// 1. \"login api_key:access_token\" - direct access token provided\n// 2. \"login request_token\" - single token (needs exchange)\n// 3. \"login\" - no token, just show instructions\n\nif (!raw_token) {\n  return [{ json: { \n    mode: \"instructions\",\n    chat_id: ctx.chat_id,\n    user_id: ctx.user_id\n  }}];\n}\n\n// Check if it's in api_key:access_token format\nif (raw_token.includes(\":\")) {\n  const parts = raw_token.split(\":\");\n  const api_key = parts[0];\n  const access_token = parts[1];\n  return [{ json: {\n    mode: \"store_token\",\n    chat_id: ctx.chat_id,\n    user_id: ctx.user_id,\n    access_token: access_token,\n    api_key: api_key\n  }}];\n}\n\n// Single token - it's a request_token\n// We can't exchange without API secret, but we can store it as access_token directly\n// (User may have already exchanged manually)\nreturn [{ json: {\n  mode: \"store_token\", \n  chat_id: ctx.chat_id,\n  user_id: ctx.user_id,\n  access_token: raw_token,\n  api_key: \"gifzm9kfars6kr8x\"\n}}];"
       },
       "id": "handle-login",
       "name": "Handle LOGIN",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         2460,
         800
       ],
-      "credentials": {
-        "telegramApi": {
-          "id": "oh2jj2bRbyNVQvgB",
-          "name": "Telegram account"
-        }
-      }
+      "credentials": {}
     },
     {
       "parameters": {
         "chatId": "={{ $(\"Parse Claude Response\").item.json.chat_id }}",
         "text": "\ud83d\udd04 *Portfolio Sync*\n\nSync from Kite Connect will fetch your latest holdings and positions.\n\n\u26a0\ufe0f This requires an active Kite session. If your token has expired, use `login <token>` first.\n\n_Automatic sync runs daily during market hours._",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "handle-sync",
@@ -911,7 +909,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "={{ '\u2705 *SELL Logged*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price) + '\\n\\n\ud83d\udcc1 View with: `portfolio`' }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "confirm-sell",
@@ -934,7 +933,8 @@
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
         "text": "={{ '\ud83d\udd14 *Alert Set*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + ($('Parse Claude Response').item.json.lower_bound ? '   \u2b07\ufe0f Lower: \u20b9' + $('Parse Claude Response').item.json.lower_bound + '\\n' : '') + ($('Parse Claude Response').item.json.upper_bound ? '   \u2b06\ufe0f Upper: \u20b9' + $('Parse Claude Response').item.json.upper_bound + '\\n' : '') + '\\nView alerts: `alerts`\\nCancel: `cancel alert ' + $('Parse Claude Response').item.json.symbol + '`' }}",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "appendAttribution": false
         }
       },
       "id": "confirm-alert-set",
@@ -951,6 +951,174 @@
           "name": "Telegram account"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-token",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "store_token",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "is-token-provided",
+      "name": "Is Token Provided?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2720,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO kite_sessions (user_id, access_token_encrypted, token_expiry, last_login_at) VALUES ($1, $2, NOW() + INTERVAL '18 hours', NOW()) ON CONFLICT (user_id) DO UPDATE SET access_token_encrypted = EXCLUDED.access_token_encrypted, token_expiry = EXCLUDED.token_expiry, last_login_at = NOW() RETURNING user_id, token_expiry",
+        "options": {
+          "queryReplacement": "={{ [$json.user_id, $json.access_token] }}"
+        }
+      },
+      "id": "store-token-db",
+      "name": "Store Token in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2980,
+        720
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Handle LOGIN').first().json.chat_id }}",
+        "text": "={{ '\u2705 *Kite Login Successful!*\\n\\nYour Zerodha session is now active.\\nToken valid until: ' + new Date($input.first().json.token_expiry).toLocaleString(\"en-IN\", {timeZone: \"Asia/Kolkata\"}) + ' IST\\n\\nLive data is now enabled. Your morning briefing will include live price data.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
+      },
+      "id": "confirm-login",
+      "name": "Confirm Login",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3240,
+        720
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Handle LOGIN').first().json.chat_id }}",
+        "text": "\ud83d\udd11 *Kite Connect Login*\n\n1. Click the link below to login:\n[Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2. Complete Zerodha login\n3. From the redirect URL, copy the full URL or just the `request_token` value\n4. Send: `login YOUR_TOKEN`\n\nOr send your existing token directly:\n`login api_key:access_token`",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
+      },
+      "id": "login-instructions",
+      "name": "Login Instructions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2980,
+        880
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format prediction/analysis response\nconst symbol = $(\"Parse Claude Response\").item.json.symbol;\nconst ctx = $(\"Parse Claude Response\").item.json;\n\n// Get the quote data from Fetch Kite Quote\nlet quote = {};\ntry {\n  const raw = $input.first().json;\n  // Kite returns: {\"status\": \"success\", \"data\": {\"NSE:SYMBOL\": {...}}}\n  if (raw.status === \"success\" && raw.data) {\n    const key = Object.keys(raw.data)[0];\n    quote = raw.data[key] || {};\n  }\n} catch(e) {}\n\nconst price = quote.last_price || null;\nconst change = quote.change || 0;\nconst changePct = (quote.change / (quote.last_price - quote.change) * 100) || 0;\nconst high = quote.ohlc?.high || null;\nconst low = quote.ohlc?.low || null;\nconst prevClose = quote.ohlc?.close || null;\n\nlet msg = `\ud83d\udd2e *Price Analysis: ${symbol}*\\n\\n`;\n\nif (price) {\n  const arrow = change >= 0 ? \"\ud83d\udcc8\" : \"\ud83d\udcc9\";\n  msg += `${arrow} *\u20b9${price.toLocaleString(\"en-IN\")}*\\n`;\n  if (change !== 0) {\n    const pct = changePct.toFixed(2);\n    msg += `   ${change >= 0 ? \"+\" : \"\"}${change.toFixed(2)} (${change >= 0 ? \"+\" : \"\"}${pct}%)\\n`;\n  }\n  if (high && low) msg += `   Day Range: \u20b9${low} \u2014 \u20b9${high}\\n`;\n  if (prevClose) msg += `   Prev Close: \u20b9${prevClose}\\n`;\n  \n  const target = ctx.upper_bound;\n  if (target) {\n    const diff = ((target - price) / price * 100).toFixed(1);\n    const dir = target > price ? \"upside\" : \"downside\";\n    msg += `\\n\ud83c\udfaf *Target: \u20b9${target}*\\n   ${Math.abs(diff)}% ${dir}\\n`;\n  }\n  \n  msg += `\\n\ud83d\udcca Full AI analysis with technicals & options data arrives in your morning briefing at 8:30 AM.`;\n} else {\n  msg += `\u26a0\ufe0f No live data available for *${symbol || \"unknown\"}*.\\n\\nThis could be because:\\n\u2022 No active Kite session (use \\`login\\`)\\n\u2022 Market is closed\\n\u2022 Invalid symbol name`;\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
+      },
+      "id": "format-predict",
+      "name": "Format Prediction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2710,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
+      },
+      "id": "send-predict",
+      "name": "Send Prediction",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2960,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.kite.trade/quote?i=NSE:' + $('Parse Claude Response').item.json.symbol }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'token gifzm9kfars6kr8x:' + $('Get Quote Token').first().json.access_token_encrypted }}"
+            },
+            {
+              "name": "X-Kite-Version",
+              "value": "3"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-kite-quote",
+      "name": "Fetch Kite Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        400
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1099,7 +1267,7 @@
         ],
         [
           {
-            "node": "Handle PREDICT",
+            "node": "Get Quote Token",
             "type": "main",
             "index": 0
           }
@@ -1248,6 +1416,79 @@
         [
           {
             "node": "Confirm Alert Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle LOGIN": {
+      "main": [
+        [
+          {
+            "node": "Is Token Provided?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Token Provided?": {
+      "main": [
+        [
+          {
+            "node": "Store Token in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Login Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Token in DB": {
+      "main": [
+        [
+          {
+            "node": "Confirm Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Prediction": {
+      "main": [
+        [
+          {
+            "node": "Send Prediction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Quote Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Kite Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Kite Quote": {
+      "main": [
+        [
+          {
+            "node": "Format Prediction",
             "type": "main",
             "index": 0
           }
