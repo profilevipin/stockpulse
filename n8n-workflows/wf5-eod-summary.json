@@ -59,9 +59,7 @@
         "operation": "executeQuery",
         "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested FROM holdings h WHERE h.user_id = $1 AND h.net_quantity > 0",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id] }}"
         }
       },
       "id": "get-user-holdings",
@@ -97,9 +95,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO daily_snapshots (user_id, snapshot_date, portfolio_value, total_pnl, day_pnl, holdings_detail) VALUES ($1, CURRENT_DATE, $2, $3, $4, $5) ON CONFLICT (user_id, snapshot_date) DO UPDATE SET portfolio_value = $2, total_pnl = $3, day_pnl = $4, holdings_detail = $5",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$('Gather Day Data').item.json.user_id, 0, 0, 0, '{}'] }}"
-          }
+          "queryReplacement": "={{ [$('Gather Day Data').item.json.user_id, 0, 0, 0, '{}'] }}"
         }
       },
       "id": "save-snapshot",

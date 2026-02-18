@@ -46,9 +46,7 @@
         "operation": "executeQuery",
         "query": "SELECT ds.snapshot_date, ds.portfolio_value, ds.total_pnl, ds.day_pnl, ds.holdings_detail FROM daily_snapshots ds WHERE ds.user_id = $1 AND ds.snapshot_date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY ds.snapshot_date",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id] }}"
         }
       },
       "id": "get-week-snapshots",
@@ -71,9 +69,7 @@
         "operation": "executeQuery",
         "query": "SELECT symbol, trade_type, quantity, price, trade_date FROM trades WHERE user_id = $1 AND trade_date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY trade_date",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ $('Get Users').item.json.user_id }}"
-          }
+          "queryReplacement": "={{ $('Get Users').item.json.user_id }}"
         }
       },
       "id": "get-week-trades",
@@ -96,9 +92,7 @@
         "operation": "executeQuery",
         "query": "SELECT symbol, direction, predicted_probability, status, actual_hit, accuracy_score FROM predictions WHERE user_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days'",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ $('Get Users').item.json.user_id }}"
-          }
+          "queryReplacement": "={{ $('Get Users').item.json.user_id }}"
         }
       },
       "id": "get-week-predictions",

@@ -134,9 +134,7 @@
         "operation": "executeQuery",
         "query": "UPDATE predictions SET status = $1, actual_hit = $2, actual_hit_date = CASE WHEN $2 THEN NOW() ELSE NULL END, actual_sessions_taken = $3, accuracy_score = $4 WHERE id = $5",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.status, $json.actual_hit, $json.actual_sessions_taken, $json.accuracy_score, $json.prediction_id] }}"
-          }
+          "queryReplacement": "={{ [$json.status, $json.actual_hit, $json.actual_sessions_taken, $json.accuracy_score, $json.prediction_id] }}"
         }
       },
       "id": "update-prediction",

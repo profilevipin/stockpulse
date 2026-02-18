@@ -117,9 +117,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, symbol, data) VALUES ($1, 'technicals', $2, $3) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $3, updated_at = NOW()",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [new Date().toISOString().split('T')[0], $json.symbol, JSON.stringify($json)] }}"
-          }
+          "queryReplacement": "={{ [new Date().toISOString().split('T')[0], $json.symbol, JSON.stringify($json)] }}"
         }
       },
       "id": "store-technicals",

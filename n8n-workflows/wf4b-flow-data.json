@@ -87,9 +87,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'fii_dii', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.date, JSON.stringify($json.data)] }}"
-          }
+          "queryReplacement": "={{ [$json.date, JSON.stringify($json.data)] }}"
         }
       },
       "id": "store-flow-staging",

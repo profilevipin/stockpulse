@@ -6,8 +6,7 @@
         "updates": [
           "message",
           "callback_query"
-        ],
-        "additionalFields": {}
+        ]
       },
       "id": "telegram-trigger",
       "name": "Telegram Trigger",
@@ -43,9 +42,7 @@
         "operation": "executeQuery",
         "query": "SELECT id, telegram_user_id, display_name, is_active, is_kite_provider, is_admin, settings, alerts_chat_id, commands_chat_id, private_chat_id FROM users WHERE telegram_user_id = $1 AND is_active = true LIMIT 1",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.telegram_user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.telegram_user_id] }}"
         }
       },
       "id": "check-auth",
@@ -217,9 +214,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO conversation_context (user_id, message, role, parsed_intent, telegram_message_id, chat_id) VALUES ($1, $2, 'user', $3, $4, $5)",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.message_text, JSON.stringify({intent: $json.intent, symbol: $json.symbol}), $json.message_id, $json.chat_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.message_text, JSON.stringify({intent: $json.intent, symbol: $json.symbol}), $json.message_id, $json.chat_id] }}"
         }
       },
       "id": "save-context",
@@ -492,9 +487,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO trades (user_id, symbol, exchange, quantity, price, trade_type, source) VALUES ($1, $2, 'NSE', $3, $4, 'BUY', 'telegram') RETURNING id, symbol, quantity, price",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol, $json.quantity, $json.price] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol, $json.quantity, $json.price] }}"
         }
       },
       "id": "handle-buy",
@@ -540,9 +533,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO trades (user_id, symbol, exchange, quantity, price, trade_type, source) VALUES ($1, $2, 'NSE', $3, $4, 'SELL', 'telegram') RETURNING id, symbol, quantity, price",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol, $json.quantity, $json.price] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol, $json.quantity, $json.price] }}"
         }
       },
       "id": "handle-sell",
@@ -565,9 +556,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO alerts (user_id, symbol, exchange, lower_bound, upper_bound) VALUES ($1, $2, 'NSE', $3, $4) RETURNING id, symbol, lower_bound, upper_bound",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol, $json.lower_bound, $json.upper_bound] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol, $json.lower_bound, $json.upper_bound] }}"
         }
       },
       "id": "handle-alert-set",
@@ -590,9 +579,7 @@
         "operation": "executeQuery",
         "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested FROM holdings h WHERE h.user_id = $1 ORDER BY h.total_invested DESC",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id] }}"
         }
       },
       "id": "handle-portfolio",
@@ -612,7 +599,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Fetch live prices for portfolio from Kite API\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n\"buy RELIANCE 10 at 2850\"', holdings: [] } }];\n}\n\n// Build Kite quote request\nconst symbols = holdings.map(h => `NSE:${h.symbol}`);\nconst queryParams = symbols.map(s => `i=${s}`).join('&');\n\n// Get Kite provider credentials\n// NOTE: In production, fetch encrypted token from DB and decrypt\nconst kiteApiKey = $env.KITE_API_KEY_USER1;\nconst kiteToken = $env.KITE_ACCESS_TOKEN; // Set by WF6\n\nlet quotes = {};\ntry {\n  const response = await fetch(\n    `https://api.kite.trade/quote?${queryParams}`,\n    {\n      headers: {\n        'X-Kite-Version': '3',\n        'Authorization': `token ${kiteApiKey}:${kiteToken}`\n      }\n    }\n  );\n  const data = await response.json();\n  quotes = data.data || {};\n} catch (e) {\n  // Kite API failed \u2014 show portfolio without live prices\n}\n\n// Build portfolio message\nlet msg = '\ud83d\udcca *Your Portfolio*\\n\\n';\nlet totalInvested = 0, totalCurrent = 0;\n\nfor (const h of holdings) {\n  const key = `NSE:${h.symbol}`;\n  const ltp = quotes[key]?.last_price || null;\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  \n  if (ltp) {\n    const current = h.net_quantity * ltp;\n    totalCurrent += current;\n    const pnl = current - invested;\n    const pnlPct = ((pnl / invested) * 100).toFixed(1);\n    const emoji = pnl >= 0 ? '\ud83d\udfe2' : '\ud83d\udd34';\n    msg += `${emoji} *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} \u00d7 \u20b9${h.avg_buy_price} \u2192 \u20b9${ltp}\\n`;\n    msg += `   P&L: \u20b9${Math.round(pnl).toLocaleString()} (${pnlPct}%)\\n\\n`;\n  } else {\n    totalCurrent += invested;\n    msg += `\u26aa *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} \u00d7 \u20b9${h.avg_buy_price} (price unavailable)\\n\\n`;\n  }\n}\n\nconst totalPnl = totalCurrent - totalInvested;\nconst totalPnlPct = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(1) : '0.0';\nconst totalEmoji = totalPnl >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n\nmsg += `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n`;\nmsg += `${totalEmoji} *Total P&L: \u20b9${Math.round(totalPnl).toLocaleString()} (${totalPnlPct}%)*\\n`;\nmsg += `\ud83d\udcb0 Invested: \u20b9${Math.round(totalInvested).toLocaleString()}\\n`;\nmsg += `\ud83d\udcca Current: \u20b9${Math.round(totalCurrent).toLocaleString()}`;\n\nreturn [{ json: { message: msg } }];"
+        "jsCode": "// Format portfolio from holdings data\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0) {\n  return [{ json: { message: '\\ud83d\\udced *No holdings found*\\n\\nStart by logging a trade:\\n\"buy RELIANCE 10 at 2850\"' } }];\n}\n\nlet msg = '\\ud83d\\udcca *Your Portfolio*\\n\\n';\nlet totalInvested = 0;\n\nfor (const h of holdings) {\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  msg += '\\u26aa *' + h.symbol + '*\\n';\n  msg += '   ' + h.net_quantity + ' x \\u20b9' + h.avg_buy_price + ' = \\u20b9' + Math.round(invested).toLocaleString() + '\\n\\n';\n}\n\nmsg += '\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\u2501\\n';\nmsg += '\\ud83d\\udcb0 *Total Invested: \\u20b9' + Math.round(totalInvested).toLocaleString() + '*\\n';\nmsg += '\\n_Live prices update with morning briefing_';\n\nreturn [{ json: { message: msg } }];"
       },
       "id": "format-portfolio",
       "name": "Format Portfolio",
@@ -756,9 +743,7 @@
         "operation": "executeQuery",
         "query": "SELECT id, symbol, lower_bound, upper_bound, status, created_at FROM alerts WHERE user_id = $1 AND status IN ('active', 'cooldown') ORDER BY created_at DESC LIMIT 20",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id] }}"
         }
       },
       "id": "fetch-alerts-list",
@@ -830,9 +815,7 @@
         "operation": "executeQuery",
         "query": "UPDATE alerts SET status = 'cancelled' WHERE user_id = $1 AND symbol = $2 AND status = 'active' RETURNING symbol",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol] }}"
         }
       },
       "id": "cancel-alert-db",

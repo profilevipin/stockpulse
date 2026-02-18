@@ -129,9 +129,7 @@
         "operation": "executeQuery",
         "query": "INSERT INTO pattern_alerts_log (user_id, symbol, pattern_type, alert_date) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, symbol, pattern_type, alert_date) DO NOTHING RETURNING id",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol, $json.pattern_type, $json.date] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol, $json.pattern_type, $json.date] }}"
         }
       },
       "id": "log-pattern",

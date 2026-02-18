@@ -178,9 +178,7 @@
         "operation": "executeQuery",
         "query": "UPDATE alerts SET status = $1, cooldown_until = $2, triggered_at = NOW(), triggered_price = $3, trigger_count = trigger_count + 1, last_triggered_at = NOW() WHERE id = $4",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.new_status, $json.cooldown_until, $json.current_price, $json.alert_id] }}"
-          }
+          "queryReplacement": "={{ [$json.new_status, $json.cooldown_until, $json.current_price, $json.alert_id] }}"
         }
       },
       "id": "update-alert-status",
