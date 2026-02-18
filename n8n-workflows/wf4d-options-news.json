@@ -145,8 +145,8 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "tVeSyglKPiSji9g7",
-          "name": "Anthropic account"
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
         }
       },
       "onError": "continueRegularOutput"

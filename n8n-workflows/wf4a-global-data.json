@@ -83,8 +83,8 @@
       ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "tVeSyglKPiSji9g7",
-          "name": "Anthropic account"
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
         }
       },
       "onError": "continueRegularOutput"
@@ -108,7 +108,7 @@
       "credentials": {
         "httpQueryAuth": {
           "id": "9Q9jzHs5MYZrTHmZ",
-          "name": "Query Auth account"
+          "name": "Finnhub Query Auth"
         }
       },
       "onError": "continueRegularOutput"
