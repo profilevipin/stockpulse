@@ -3,15 +3,27 @@
   "nodes": [
     {
       "parameters": {
-        "updates": ["message", "callback_query"],
+        "updates": [
+          "message",
+          "callback_query"
+        ],
         "additionalFields": {}
       },
       "id": "telegram-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [220, 300],
-      "webhookId": "stockpulse-main"
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "stockpulse-main",
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
@@ -21,11 +33,14 @@
       "name": "Extract Message Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT id, telegram_user_id, display_name, is_active, is_kite_provider, is_admin, settings, alerts_chat_id, commands_chat_id, private_chat_id FROM users WHERE telegram_user_id = $1 AND is_active = true LIMIT 1",
         "options": {
           "queryParameterBindings": {
@@ -37,11 +52,14 @@
       "name": "Check User Auth",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [660, 300],
+      "position": [
+        660,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "StockPulse DB"
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
         }
       }
     },
@@ -51,7 +69,7 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
@@ -71,12 +89,15 @@
       "name": "Is Authorized?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
         "chatId": "={{ $('Extract Message Data').item.json.chat_id }}",
-        "text": "⛔ Unauthorized. You are not registered to use StockPulse.\n\nContact the admin to get access.",
+        "text": "\u26d4 Unauthorized. You are not registered to use StockPulse.\n\nContact the admin to get access.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -85,11 +106,14 @@
       "name": "Reject Unauthorized",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1100, 500],
+      "position": [
+        1100,
+        500
+      ],
       "credentials": {
         "telegramApi": {
-          "id": "TELEGRAM_CREDENTIAL_ID",
-          "name": "StockPulse Bot"
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
         }
       }
     },
@@ -101,18 +125,28 @@
       "name": "Prepare User Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 200]
+      "position": [
+        1100,
+        200
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "is-file",
               "leftValue": "={{ $json.message_type }}",
               "rightValue": "file",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -122,7 +156,10 @@
       "name": "Is File Upload?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1320, 200]
+      "position": [
+        1320,
+        200
+      ]
     },
     {
       "parameters": {
@@ -133,23 +170,32 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE). Extract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|predict|briefing|alerts_list|sync|login|settings|help|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is predict or unknown\"\\n}\\n\\nMap common names: Reliance→RELIANCE, Infosys→INFY, TCS→TCS, HDFC Bank→HDFCBANK, Tata Motors→TATAMOTORS, Wipro→WIPRO, ITC→ITC, SBI→SBIN, Axis Bank→AXISBANK, Kotak→KOTAKBANK, Bajaj Finance→BAJFINANCE, HCL Tech→HCLTECH, Asian Paints→ASIANPAINT, Maruti→MARUTI, Sun Pharma→SUNPHARMA, Titan→TITAN, L&T→LT, Adani→ADANIENT, Bharti Airtel→BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"when will X hit Y\", intent=predict with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE). Extract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|predict|briefing|alerts_list|sync|login|settings|help|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is predict or unknown\"\\n}\\n\\nMap common names: Reliance\u2192RELIANCE, Infosys\u2192INFY, TCS\u2192TCS, HDFC Bank\u2192HDFCBANK, Tata Motors\u2192TATAMOTORS, Wipro\u2192WIPRO, ITC\u2192ITC, SBI\u2192SBIN, Axis Bank\u2192AXISBANK, Kotak\u2192KOTAKBANK, Bajaj Finance\u2192BAJFINANCE, HCL Tech\u2192HCLTECH, Asian Paints\u2192ASIANPAINT, Maruti\u2192MARUTI, Sun Pharma\u2192SUNPHARMA, Titan\u2192TITAN, L&T\u2192LT, Adani\u2192ADANIENT, Bharti Airtel\u2192BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"when will X hit Y\", intent=predict with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
       },
       "id": "claude-parse-intent",
       "name": "Claude: Parse Intent",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 100],
+      "position": [
+        1540,
+        100
+      ],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "CLAUDE_CREDENTIAL_ID",
-          "name": "Claude API"
+          "id": "tVeSyglKPiSji9g7",
+          "name": "Anthropic account"
         }
       }
     },
@@ -161,11 +207,14 @@
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 100]
+      "position": [
+        1760,
+        100
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO conversation_context (user_id, message, role, parsed_intent, telegram_message_id, chat_id) VALUES ($1, $2, 'user', $3, $4, $5)",
         "options": {
           "queryParameterBindings": {
@@ -177,11 +226,14 @@
       "name": "Save to Context",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1980, 100],
+      "position": [
+        1980,
+        100
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "StockPulse DB"
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
         }
       }
     },
@@ -189,30 +241,255 @@
       "parameters": {
         "rules": {
           "values": [
-            { "outputIndex": 0, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "buy", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 1, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "sell", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 2, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "alert_set", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 3, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "portfolio", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 4, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "predict", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 5, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "briefing", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 6, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "alerts_list", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 7, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "alert_cancel", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 8, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "login", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 9, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "sync", "operator": { "type": "string", "operation": "equals" } }] } },
-            { "outputIndex": 10, "conditions": { "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "help", "operator": { "type": "string", "operation": "equals" } }] } }
-          ],
-          "fallbackOutput": 11
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-buy",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "buy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-sell",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "sell",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-alert-set",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "alert_set",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-portfolio",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "portfolio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-predict",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "predict",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-briefing",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "briefing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-alerts-list",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "alerts_list",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-alert-cancel",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "alert_cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-login",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "login",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-sync",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "sync",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-help",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
         }
       },
       "id": "route-by-intent",
       "name": "Route by Intent",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [2200, 100]
+      "position": [
+        2200,
+        100
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO trades (user_id, symbol, exchange, quantity, price, trade_type, source) VALUES ($1, $2, 'NSE', $3, $4, 'BUY', 'telegram') RETURNING id, symbol, quantity, price",
         "options": {
           "queryParameterBindings": {
@@ -224,39 +501,43 @@
       "name": "Handle BUY",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2460, -200],
+      "position": [
+        2460,
+        -200
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-        "text": "={{ '✅ *BUY Logged*\\n\\n' + '📊 ' + $('Parse Claude Response').item.json.symbol + '\\n' + '   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n' + '   Price: ₹' + $('Parse Claude Response').item.json.price + '\\n' + '   Total: ₹' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price).toLocaleString() + '\\n\\n' + 'Want to set a price alert for this stock?' }}",
+        "text": "={{ '\u2705 *BUY Logged*\\n\\n' + '\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + '   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n' + '   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n' + '   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price).toLocaleString() + '\\n\\n' + '\ud83d\udca1 Set a price alert: `alert ' + $('Parse Claude Response').item.json.symbol + ' LOWER-UPPER`' }}",
         "additionalFields": {
-          "parse_mode": "Markdown",
-          "reply_markup": {
-            "inline_keyboard": [
-              [
-                { "text": "🔔 Set Alert", "callback_data": "={{ 'alert_prompt_' + $('Parse Claude Response').item.json.symbol }}" },
-                { "text": "❌ Skip", "callback_data": "skip" }
-              ]
-            ]
-          }
+          "parse_mode": "Markdown"
         }
       },
       "id": "confirm-buy",
       "name": "Confirm BUY",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2700, -200],
+      "position": [
+        2700,
+        -200
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO trades (user_id, symbol, exchange, quantity, price, trade_type, source) VALUES ($1, $2, 'NSE', $3, $4, 'SELL', 'telegram') RETURNING id, symbol, quantity, price",
         "options": {
           "queryParameterBindings": {
@@ -268,14 +549,20 @@
       "name": "Handle SELL",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2460, -50],
+      "position": [
+        2460,
+        -50
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO alerts (user_id, symbol, exchange, lower_bound, upper_bound) VALUES ($1, $2, 'NSE', $3, $4) RETURNING id, symbol, lower_bound, upper_bound",
         "options": {
           "queryParameterBindings": {
@@ -287,14 +574,20 @@
       "name": "Handle ALERT SET",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2460, 100],
+      "position": [
+        2460,
+        100
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested FROM holdings h WHERE h.user_id = $1 ORDER BY h.total_invested DESC",
         "options": {
           "queryParameterBindings": {
@@ -306,20 +599,29 @@
       "name": "Handle PORTFOLIO",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2460, 250],
+      "position": [
+        2460,
+        250
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Fetch live prices for portfolio from Kite API\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0) {\n  return [{ json: { message: '📭 *No holdings found*\\n\\nStart by logging a trade:\\n\"buy RELIANCE 10 at 2850\"', holdings: [] } }];\n}\n\n// Build Kite quote request\nconst symbols = holdings.map(h => `NSE:${h.symbol}`);\nconst queryParams = symbols.map(s => `i=${s}`).join('&');\n\n// Get Kite provider credentials\n// NOTE: In production, fetch encrypted token from DB and decrypt\nconst kiteApiKey = $env.KITE_API_KEY_USER1;\nconst kiteToken = $env.KITE_ACCESS_TOKEN; // Set by WF6\n\nlet quotes = {};\ntry {\n  const response = await fetch(\n    `https://api.kite.trade/quote?${queryParams}`,\n    {\n      headers: {\n        'X-Kite-Version': '3',\n        'Authorization': `token ${kiteApiKey}:${kiteToken}`\n      }\n    }\n  );\n  const data = await response.json();\n  quotes = data.data || {};\n} catch (e) {\n  // Kite API failed — show portfolio without live prices\n}\n\n// Build portfolio message\nlet msg = '📊 *Your Portfolio*\\n\\n';\nlet totalInvested = 0, totalCurrent = 0;\n\nfor (const h of holdings) {\n  const key = `NSE:${h.symbol}`;\n  const ltp = quotes[key]?.last_price || null;\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  \n  if (ltp) {\n    const current = h.net_quantity * ltp;\n    totalCurrent += current;\n    const pnl = current - invested;\n    const pnlPct = ((pnl / invested) * 100).toFixed(1);\n    const emoji = pnl >= 0 ? '🟢' : '🔴';\n    msg += `${emoji} *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} × ₹${h.avg_buy_price} → ₹${ltp}\\n`;\n    msg += `   P&L: ₹${Math.round(pnl).toLocaleString()} (${pnlPct}%)\\n\\n`;\n  } else {\n    totalCurrent += invested;\n    msg += `⚪ *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} × ₹${h.avg_buy_price} (price unavailable)\\n\\n`;\n  }\n}\n\nconst totalPnl = totalCurrent - totalInvested;\nconst totalPnlPct = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(1) : '0.0';\nconst totalEmoji = totalPnl >= 0 ? '📈' : '📉';\n\nmsg += `━━━━━━━━━━━━━━━━━━\\n`;\nmsg += `${totalEmoji} *Total P&L: ₹${Math.round(totalPnl).toLocaleString()} (${totalPnlPct}%)*\\n`;\nmsg += `💰 Invested: ₹${Math.round(totalInvested).toLocaleString()}\\n`;\nmsg += `📊 Current: ₹${Math.round(totalCurrent).toLocaleString()}`;\n\nreturn [{ json: { message: msg } }];"
+        "jsCode": "// Fetch live prices for portfolio from Kite API\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n\"buy RELIANCE 10 at 2850\"', holdings: [] } }];\n}\n\n// Build Kite quote request\nconst symbols = holdings.map(h => `NSE:${h.symbol}`);\nconst queryParams = symbols.map(s => `i=${s}`).join('&');\n\n// Get Kite provider credentials\n// NOTE: In production, fetch encrypted token from DB and decrypt\nconst kiteApiKey = $env.KITE_API_KEY_USER1;\nconst kiteToken = $env.KITE_ACCESS_TOKEN; // Set by WF6\n\nlet quotes = {};\ntry {\n  const response = await fetch(\n    `https://api.kite.trade/quote?${queryParams}`,\n    {\n      headers: {\n        'X-Kite-Version': '3',\n        'Authorization': `token ${kiteApiKey}:${kiteToken}`\n      }\n    }\n  );\n  const data = await response.json();\n  quotes = data.data || {};\n} catch (e) {\n  // Kite API failed \u2014 show portfolio without live prices\n}\n\n// Build portfolio message\nlet msg = '\ud83d\udcca *Your Portfolio*\\n\\n';\nlet totalInvested = 0, totalCurrent = 0;\n\nfor (const h of holdings) {\n  const key = `NSE:${h.symbol}`;\n  const ltp = quotes[key]?.last_price || null;\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  \n  if (ltp) {\n    const current = h.net_quantity * ltp;\n    totalCurrent += current;\n    const pnl = current - invested;\n    const pnlPct = ((pnl / invested) * 100).toFixed(1);\n    const emoji = pnl >= 0 ? '\ud83d\udfe2' : '\ud83d\udd34';\n    msg += `${emoji} *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} \u00d7 \u20b9${h.avg_buy_price} \u2192 \u20b9${ltp}\\n`;\n    msg += `   P&L: \u20b9${Math.round(pnl).toLocaleString()} (${pnlPct}%)\\n\\n`;\n  } else {\n    totalCurrent += invested;\n    msg += `\u26aa *${h.symbol}*\\n`;\n    msg += `   ${h.net_quantity} \u00d7 \u20b9${h.avg_buy_price} (price unavailable)\\n\\n`;\n  }\n}\n\nconst totalPnl = totalCurrent - totalInvested;\nconst totalPnlPct = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(1) : '0.0';\nconst totalEmoji = totalPnl >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n\nmsg += `\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n`;\nmsg += `${totalEmoji} *Total P&L: \u20b9${Math.round(totalPnl).toLocaleString()} (${totalPnlPct}%)*\\n`;\nmsg += `\ud83d\udcb0 Invested: \u20b9${Math.round(totalInvested).toLocaleString()}\\n`;\nmsg += `\ud83d\udcca Current: \u20b9${Math.round(totalCurrent).toLocaleString()}`;\n\nreturn [{ json: { message: msg } }];"
       },
       "id": "format-portfolio",
       "name": "Format Portfolio",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2700, 250]
+      "position": [
+        2700,
+        250
+      ]
     },
     {
       "parameters": {
@@ -333,117 +635,580 @@
       "name": "Send Portfolio",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2920, 250],
+      "position": [
+        2920,
+        250
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     },
     {
       "parameters": {
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-        "text": "🤖 *StockPulse Commands*\n\n📈 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n🔔 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` — view active alerts\n`cancel alert RELIANCE`\n\n📊 *Portfolio*\n`portfolio` — view holdings + P&L\n`sync` — sync from Kite (User 1 only)\n\n🔮 *Analysis*\n`predict RELIANCE 3000`\n`when will TCS hit 4000`\n`briefing` — morning analysis\n\n📎 *File Upload*\nSend a CSV file to bulk import trades\n\n⚙️ *Settings*\n`login <token>` — connect Kite\n`settings` — view preferences",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 view holdings + P&L\n`sync` \u2014 sync from Kite (User 1 only)\n\n\ud83d\udd2e *Analysis*\n`predict RELIANCE 3000`\n`when will TCS hit 4000`\n`briefing` \u2014 morning analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "id": "handle-help",
       "name": "Handle HELP",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2460, 750],
+      "position": [
+        2460,
+        750
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     },
     {
       "parameters": {
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-        "text": "={{ '🤔 I didn\\'t quite understand that.\\n\\nYou said: \"' + $('Prepare User Context').item.json.message_text + '\"\\n\\nTry one of these:\\n• `buy RELIANCE 10 at 2850`\\n• `alert INFY 1400-1500`\\n• `portfolio`\\n• `help` for all commands' }}",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "text": "={{ '\ud83e\udd14 I didn\\'t quite understand that.\\n\\nYou said: \"' + $('Prepare User Context').item.json.message_text + '\"\\n\\nTry one of these:\\n\u2022 `buy RELIANCE 10 at 2850`\\n\u2022 `alert INFY 1400-1500`\\n\u2022 `portfolio`\\n\u2022 `help` for all commands' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "id": "handle-unknown",
       "name": "Handle Unknown",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2460, 900],
+      "position": [
+        2460,
+        900
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Handle CSV/XLS file upload for trade import\nconst ctx = $('Prepare User Context').item.json;\nconst fileInfo = ctx.file_info;\n\nif (!fileInfo) {\n  return [{ json: { message: '❌ No file detected. Please send a CSV or XLSX file.' } }];\n}\n\nconst fileName = fileInfo.file_name.toLowerCase();\nif (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {\n  return [{ json: { message: '❌ Unsupported file type. Please send a .csv or .xlsx file.\\n\\nCSV format:\\n```\\nSymbol,Type,Quantity,Price,Date\\nRELIANCE,BUY,10,2850,2026-02-15\\n```' } }];\n}\n\n// Return file info for download in next node\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    user_id: ctx.user_id,\n    chat_id: ctx.chat_id\n  }\n}];"
+        "jsCode": "// Handle CSV/XLS file upload for trade import\nconst ctx = $('Prepare User Context').item.json;\nconst fileInfo = ctx.file_info;\n\nif (!fileInfo) {\n  return [{ json: { message: '\u274c No file detected. Please send a CSV or XLSX file.' } }];\n}\n\nconst fileName = fileInfo.file_name.toLowerCase();\nif (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {\n  return [{ json: { message: '\u274c Unsupported file type. Please send a .csv or .xlsx file.\\n\\nCSV format:\\n```\\nSymbol,Type,Quantity,Price,Date\\nRELIANCE,BUY,10,2850,2026-02-15\\n```' } }];\n}\n\n// Return file info for download in next node\nreturn [{\n  json: {\n    file_id: fileInfo.file_id,\n    file_name: fileInfo.file_name,\n    user_id: ctx.user_id,\n    chat_id: ctx.chat_id\n  }\n}];"
       },
       "id": "handle-file-upload",
       "name": "Handle File Upload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 350]
+      "position": [
+        1540,
+        350
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ '\ud83d\udd2e *Price Prediction*\\n\\n' + ($json.symbol ? 'Symbol: *' + $json.symbol + '*\\n' : '') + ($json.upper_bound ? 'Target: \u20b9' + $json.upper_bound + '\\n\\n' : '\\n') + 'Prediction analysis is generated in your morning briefing at 8:30 AM with technical levels, options data, and AI-driven scenarios.\\n\\nFor quick technicals, check the morning briefing or wait for the next scheduled analysis.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "handle-predict",
+      "name": "Handle PREDICT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2460,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "\ud83d\udccb *Morning Briefing*\n\nThe morning briefing is sent automatically at *8:30 AM* (IST) every trading day.\n\nIt includes:\n\u2022 Global market cues (SGX Nifty, US markets)\n\u2022 FII/DII activity\n\u2022 Technical analysis for your stocks\n\u2022 Options data & sentiment\n\u2022 Top 5 stocks by attention score\n\nIf you missed today's briefing, it will arrive tomorrow morning.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "handle-briefing",
+      "name": "Handle BRIEFING",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2460,
+        500
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, symbol, lower_bound, upper_bound, status, created_at FROM alerts WHERE user_id = $1 AND status IN ('active', 'cooldown') ORDER BY created_at DESC LIMIT 20",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.user_id] }}"
+          }
+        }
+      },
+      "id": "fetch-alerts-list",
+      "name": "Fetch Active Alerts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2460,
+        600
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerts = $input.all().map(i => i.json);\nconst chatId = $('Route by Intent').first().json.chat_id;\n\nif (alerts.length === 0) {\n  return [{ json: { chat_id: chatId, message: '\ud83d\udced *No active alerts*\\n\\nSet one with:\\n`alert RELIANCE 2800-2950`' } }];\n}\n\nlet msg = '\ud83d\udd14 *Your Active Alerts*\\n\\n';\nfor (const a of alerts) {\n  const bounds = [];\n  if (a.lower_bound) bounds.push(`\u2b07\ufe0f \u20b9${a.lower_bound}`);\n  if (a.upper_bound) bounds.push(`\u2b06\ufe0f \u20b9${a.upper_bound}`);\n  const status = a.status === 'cooldown' ? ' _(cooldown)_' : '';\n  msg += `\u2022 *${a.symbol}* \u2014 ${bounds.join(' / ')}${status}\\n`;\n}\nmsg += `\\n_${alerts.length} alert(s) active_\\n\\nCancel with: \\`cancel alert SYMBOL\\``;\n\nreturn [{ json: { chat_id: chatId, message: msg } }];"
+      },
+      "id": "format-alerts-list",
+      "name": "Format Alerts List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "send-alerts-list",
+      "name": "Send Alerts List",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2920,
+        600
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const symbol = $json.symbol;\nconst userId = $json.user_id;\nconst chatId = $json.chat_id;\n\nif (!symbol) {\n  return [{ json: { chat_id: chatId, query: null, message: '\u274c Please specify which alert to cancel:\\n`cancel alert RELIANCE`' } }];\n}\n\nreturn [{ json: { chat_id: chatId, user_id: userId, symbol: symbol, query: `UPDATE alerts SET status = 'cancelled' WHERE user_id = ${userId} AND symbol = '${symbol}' AND status = 'active' RETURNING symbol` } }];"
+      },
+      "id": "prepare-alert-cancel",
+      "name": "Prepare Alert Cancel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE alerts SET status = 'cancelled' WHERE user_id = $1 AND symbol = $2 AND status = 'active' RETURNING symbol",
+        "options": {
+          "queryParameterBindings": {
+            "bindings": "={{ [$json.user_id, $json.symbol] }}"
+          }
+        }
+      },
+      "id": "cancel-alert-db",
+      "name": "Cancel Alert in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2700,
+        700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Prepare Alert Cancel').first().json.chat_id }}",
+        "text": "={{ $input.all().length > 0 ? '\u2705 Alert for *' + $('Prepare Alert Cancel').first().json.symbol + '* cancelled.' : '\u26a0\ufe0f No active alert found for *' + $('Prepare Alert Cancel').first().json.symbol + '*.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "confirm-alert-cancel",
+      "name": "Confirm Alert Cancel",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2920,
+        700
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.request_token ? '\ud83d\udd11 Processing Kite login with token: `' + $json.request_token + '`\\n\\nPlease wait while we validate your session...' : '\ud83d\udd11 *Kite Connect Login*\\n\\n1. Click the login link sent by the Token Manager (WF6) at 8:45 AM\\n2. Login to Zerodha\\n3. Copy the `request_token` from the redirect URL\\n4. Send: `login YOUR_TOKEN_HERE`' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "handle-login",
+      "name": "Handle LOGIN",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2460,
+        800
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "\ud83d\udd04 *Portfolio Sync*\n\nSync from Kite Connect will fetch your latest holdings and positions.\n\n\u26a0\ufe0f This requires an active Kite session. If your token has expired, use `login <token>` first.\n\n_Automatic sync runs daily during market hours._",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "handle-sync",
+      "name": "Handle SYNC",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2460,
+        850
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
     "Telegram Trigger": {
-      "main": [[{ "node": "Extract Message Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract Message Data": {
-      "main": [[{ "node": "Check User Auth", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check User Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check User Auth": {
-      "main": [[{ "node": "Is Authorized?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is Authorized?": {
       "main": [
-        [{ "node": "Prepare User Context", "type": "main", "index": 0 }],
-        [{ "node": "Reject Unauthorized", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Prepare User Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepare User Context": {
-      "main": [[{ "node": "Is File Upload?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is File Upload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is File Upload?": {
       "main": [
-        [{ "node": "Handle File Upload", "type": "main", "index": 0 }],
-        [{ "node": "Claude: Parse Intent", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Handle File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Claude: Parse Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Claude: Parse Intent": {
-      "main": [[{ "node": "Parse Claude Response", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Claude Response": {
-      "main": [[{ "node": "Save to Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Save to Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Save to Context": {
-      "main": [[{ "node": "Route by Intent", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Route by Intent": {
       "main": [
-        [{ "node": "Handle BUY", "type": "main", "index": 0 }],
-        [{ "node": "Handle SELL", "type": "main", "index": 0 }],
-        [{ "node": "Handle ALERT SET", "type": "main", "index": 0 }],
-        [{ "node": "Handle PORTFOLIO", "type": "main", "index": 0 }],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [{ "node": "Handle HELP", "type": "main", "index": 0 }],
-        [{ "node": "Handle Unknown", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Handle BUY",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle SELL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle ALERT SET",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle PORTFOLIO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle PREDICT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle BRIEFING",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Active Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Alert Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle LOGIN",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle SYNC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle HELP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Handle BUY": {
-      "main": [[{ "node": "Confirm BUY", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Confirm BUY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Handle PORTFOLIO": {
-      "main": [[{ "node": "Format Portfolio", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Format Portfolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Portfolio": {
-      "main": [[{ "node": "Send Portfolio", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Portfolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Alerts": {
+      "main": [
+        [
+          {
+            "node": "Format Alerts List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alerts List": {
+      "main": [
+        [
+          {
+            "node": "Send Alerts List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Alert Cancel": {
+      "main": [
+        [
+          {
+            "node": "Cancel Alert in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Alert in DB": {
+      "main": [
+        [
+          {
+            "node": "Confirm Alert Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": [{ "name": "StockPulse" }],
+  "tags": [
+    {
+      "name": "StockPulse"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }

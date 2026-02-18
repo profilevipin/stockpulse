@@ -4,27 +4,41 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "15 8 * * 1-5" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 8 * * 1-5"
+            }
+          ]
         }
       },
       "id": "cron-815am",
       "name": "8:15 AM Mon-Fri",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
       },
       "id": "get-symbols",
       "name": "Get Symbols",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
@@ -35,7 +49,10 @@
       "name": "Add NIFTY to List",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -47,7 +64,11 @@
       "name": "NSE: NIFTY Option Chain",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 150]
+      "position": [
+        880,
+        150
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -57,7 +78,10 @@
       "name": "Analyze NIFTY Options",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 150]
+      "position": [
+        1100,
+        150
+      ]
     },
     {
       "parameters": {
@@ -67,7 +91,10 @@
       "name": "Build News Query",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 450]
+      "position": [
+        880,
+        450
+      ]
     },
     {
       "parameters": {
@@ -79,7 +106,11 @@
       "name": "NewsAPI: Stock News",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 450]
+      "position": [
+        1100,
+        450
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -90,8 +121,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -102,10 +139,17 @@
       "name": "Claude: Sentiment Score",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 450],
+      "position": [
+        1320,
+        450
+      ],
       "credentials": {
-        "httpHeaderAuth": { "id": "CLAUDE_CREDENTIAL_ID", "name": "Claude API" }
-      }
+        "httpHeaderAuth": {
+          "id": "tVeSyglKPiSji9g7",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -117,21 +161,28 @@
       "name": "NSE: Corporate Actions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 650]
+      "position": [
+        880,
+        650
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Combine all data: options + news sentiment + corporate actions\nconst niftyOptions = $('Analyze NIFTY Options').first().json;\nconst sentimentResponse = $('Claude: Sentiment Score').first().json;\nconst corporateActions = $('NSE: Corporate Actions').first().json;\nconst newsArticles = $('NewsAPI: Stock News').first().json;\n\n// Parse sentiment\nlet sentiment = [];\ntry {\n  const text = sentimentResponse.content\n    .filter(c => c.type === 'text').map(c => c.text).join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  sentiment = JSON.parse(clean);\n} catch (e) {\n  sentiment = [{ parse_error: e.message }];\n}\n\nconst dateStr = new Date().toISOString().split('T')[0];\n\nconst combinedData = {\n  nifty_options: niftyOptions,\n  news_sentiment: sentiment,\n  corporate_actions: corporateActions,\n  news_articles: (newsArticles.articles || []).slice(0, 10).map(a => ({\n    title: a.title,\n    source: a.source?.name,\n    publishedAt: a.publishedAt\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: dateStr } }];"
+        "jsCode": "// Combine all data: options + news sentiment + corporate actions with error handling\nlet niftyOptions = {};\nlet sentimentResponse = {};\nlet corporateActions = {};\nlet newsArticles = {};\n\ntry { niftyOptions = $('Analyze NIFTY Options').first().json; } catch (e) { niftyOptions = { symbol: 'NIFTY', error: 'Options data unavailable' }; }\ntry { sentimentResponse = $('Claude: Sentiment Score').first().json; } catch (e) { sentimentResponse = { content: [{ type: 'text', text: '[]' }] }; }\ntry { corporateActions = $('NSE: Corporate Actions').first().json; } catch (e) { corporateActions = { error: 'Corporate actions unavailable' }; }\ntry { newsArticles = $('NewsAPI: Stock News').first().json; } catch (e) { newsArticles = { articles: [] }; }\n\n// Parse sentiment\nlet sentiment = [];\ntry {\n  const content = sentimentResponse.content || [];\n  const text = content.filter(c => c.type === 'text').map(c => c.text).join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  sentiment = JSON.parse(clean);\n} catch (e) {\n  sentiment = [{ parse_error: e.message }];\n}\n\nconst dateStr = new Date().toISOString().split('T')[0];\n\nconst combinedData = {\n  nifty_options: niftyOptions,\n  news_sentiment: sentiment,\n  corporate_actions: corporateActions,\n  news_articles: (newsArticles.articles || []).slice(0, 10).map(a => ({\n    title: a.title,\n    source: a.source?.name,\n    publishedAt: a.publishedAt\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: dateStr } }];"
       },
       "id": "combine-options-news",
       "name": "Combine Options & News",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 400]
+      "position": [
+        1540,
+        400
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'options_news', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
         "options": {
           "queryParameterBindings": {
@@ -143,52 +194,151 @@
       "name": "Store in Staging",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1760, 400],
+      "position": [
+        1760,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     }
   ],
   "connections": {
     "8:15 AM Mon-Fri": {
-      "main": [[{ "node": "Get Symbols", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Symbols": {
-      "main": [[{ "node": "Add NIFTY to List", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Add NIFTY to List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Add NIFTY to List": {
       "main": [
         [
-          { "node": "NSE: NIFTY Option Chain", "type": "main", "index": 0 },
-          { "node": "Build News Query", "type": "main", "index": 0 },
-          { "node": "NSE: Corporate Actions", "type": "main", "index": 0 }
+          {
+            "node": "NSE: NIFTY Option Chain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build News Query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NSE: Corporate Actions",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "NSE: NIFTY Option Chain": {
-      "main": [[{ "node": "Analyze NIFTY Options", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Analyze NIFTY Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Analyze NIFTY Options": {
-      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Options & News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build News Query": {
-      "main": [[{ "node": "NewsAPI: Stock News", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "NewsAPI: Stock News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "NewsAPI: Stock News": {
-      "main": [[{ "node": "Claude: Sentiment Score", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Claude: Sentiment Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Claude: Sentiment Score": {
-      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Options & News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "NSE: Corporate Actions": {
-      "main": [[{ "node": "Combine Options & News", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Options & News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Combine Options & News": {
-      "main": [[{ "node": "Store in Staging", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Store in Staging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    },
+    {
+      "name": "Morning Pipeline"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }

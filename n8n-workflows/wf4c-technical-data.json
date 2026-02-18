@@ -4,27 +4,41 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
         }
       },
       "id": "cron-8am",
       "name": "8:00 AM Mon-Fri",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
       },
       "id": "get-all-symbols",
       "name": "Get All Symbols",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
@@ -35,7 +49,10 @@
       "name": "Build Historical URLs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -46,7 +63,10 @@
       "name": "Process Each Symbol",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
@@ -56,16 +76,27 @@
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "X-Kite-Version", "value": "3" }]
+          "parameters": [
+            {
+              "name": "X-Kite-Version",
+              "value": "3"
+            }
+          ]
         }
       },
       "id": "kite-historical",
       "name": "Kite: Historical OHLC",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 300],
+      "position": [
+        1100,
+        300
+      ],
       "credentials": {
-        "httpHeaderAuth": { "id": "KITE_CREDENTIAL_ID", "name": "Kite Connect" }
+        "httpHeaderAuth": {
+          "id": "du74DqpJeNl4luFf",
+          "name": "Header Auth account"
+        }
       }
     },
     {
@@ -76,11 +107,14 @@
       "name": "Calculate Full Technicals",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 300]
+      "position": [
+        1320,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, symbol, data) VALUES ($1, 'technicals', $2, $3) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $3, updated_at = NOW()",
         "options": {
           "queryParameterBindings": {
@@ -92,39 +126,108 @@
       "name": "Store Technicals",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1540, 300],
+      "position": [
+        1540,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     }
   ],
   "connections": {
     "8:00 AM Mon-Fri": {
-      "main": [[{ "node": "Get All Symbols", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get All Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get All Symbols": {
-      "main": [[{ "node": "Build Historical URLs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Historical URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Historical URLs": {
-      "main": [[{ "node": "Process Each Symbol", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Process Each Symbol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Process Each Symbol": {
       "main": [
-        [{ "node": "Kite: Historical OHLC", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Kite: Historical OHLC",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Kite: Historical OHLC": {
-      "main": [[{ "node": "Calculate Full Technicals", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Calculate Full Technicals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Calculate Full Technicals": {
-      "main": [[{ "node": "Store Technicals", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Store Technicals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Store Technicals": {
-      "main": [[{ "node": "Process Each Symbol", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Process Each Symbol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    },
+    {
+      "name": "Morning Pipeline"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }
