@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-19T04:25:27.568Z",
+    "updatedAt": "2026-02-19T05:02:15.634Z",
     "createdAt": "2026-02-18T07:36:36.580Z",
     "id": "kGn3KwIfHldiwuGW",
     "name": "WF1 \u2014 Message Handler",
@@ -1612,7 +1612,7 @@
                 },
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2500,  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with disclaimer: Technical analysis only, not financial advice.',  messages: [{    role: 'user',    content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)  }]}) }}"
+                "jsonBody": "={{ JSON.stringify({model: 'claude-sonnet-4-20250514', max_tokens: 2500, system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with: Technical analysis only, not financial advice.', messages: [{role: 'user', content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)}]}) }}"
             }
         },
         {
@@ -1809,7 +1809,7 @@
                 500
             ],
             "parameters": {
-                "jsCode": "const items = $input.all().filter(i => i.json.symbol);\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data,\n  global_cues: i.json.global_cues,\n  fii_dii: i.json.fii_dii\n}));\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: items.length > 0 ? items[0].json.global_cues : null,\n    fii_dii: items.length > 0 ? items[0].json.fii_dii : null\n  }\n}];"
+                "jsCode": "const items = $input.all().filter(i => i.json.symbol);\n\n// Extract holdings WITHOUT duplicating global_cues/fii_dii per holding\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data\n}));\n\n// Extract global cues once, strip raw web search artifacts to reduce payload\nlet globalCues = null;\nif (items.length > 0 && items[0].json.global_cues) {\n  const gc = items[0].json.global_cues;\n  const inner = gc.global_cues || gc;\n  // Extract only the useful text summary, skip raw tool_use data\n  const rawItems = Array.isArray(inner.raw) ? inner.raw : [];\n  const textSummary = rawItems.filter(r => r.type === 'text').map(r => r.text).join('\\n');\n  const searchResults = rawItems\n    .filter(r => r.type === 'web_search_tool_result')\n    .flatMap(r => (r.content || []).map(c => c.title).filter(Boolean))\n    .slice(0, 10);\n\n  globalCues = {\n    summary: textSummary || inner.parse_error || 'No global cues available',\n    sources: searchResults,\n    indices: (gc.global_indices || inner.global_indices || {}).indices || {},\n    collected_at: gc.collected_at || null\n  };\n}\n\nlet fiiDii = null;\nif (items.length > 0 && items[0].json.fii_dii) {\n  const fd = items[0].json.fii_dii;\n  if (fd.fii_dii && fd.fii_dii.error) {\n    fiiDii = { error: 'FII/DII data temporarily unavailable' };\n  } else {\n    fiiDii = fd.fii_dii || fd;\n  }\n}\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: globalCues,\n    fii_dii: fiiDii\n  }\n}];"
             }
         },
         {
@@ -2623,9 +2623,9 @@
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
-    "activeVersionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
-    "versionCounter": 137,
+    "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
+    "activeVersionId": "2423dad6-2527-4850-a695-0b02d471da73",
+    "versionCounter": 142,
     "triggerCount": 1,
     "shared": [
         {
@@ -2648,9 +2648,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-19T04:25:27.574Z",
-        "createdAt": "2026-02-19T04:25:27.574Z",
-        "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+        "updatedAt": "2026-02-19T05:02:15.642Z",
+        "createdAt": "2026-02-19T05:02:15.642Z",
+        "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
         "workflowId": "kGn3KwIfHldiwuGW",
         "nodes": [
             {
@@ -4258,7 +4258,7 @@
                     },
                     "sendBody": true,
                     "specifyBody": "json",
-                    "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2500,  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with disclaimer: Technical analysis only, not financial advice.',  messages: [{    role: 'user',    content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)  }]}) }}"
+                    "jsonBody": "={{ JSON.stringify({model: 'claude-sonnet-4-20250514', max_tokens: 2500, system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with: Technical analysis only, not financial advice.', messages: [{role: 'user', content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)}]}) }}"
                 }
             },
             {
@@ -4455,7 +4455,7 @@
                     500
                 ],
                 "parameters": {
-                    "jsCode": "const items = $input.all().filter(i => i.json.symbol);\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data,\n  global_cues: i.json.global_cues,\n  fii_dii: i.json.fii_dii\n}));\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: items.length > 0 ? items[0].json.global_cues : null,\n    fii_dii: items.length > 0 ? items[0].json.fii_dii : null\n  }\n}];"
+                    "jsCode": "const items = $input.all().filter(i => i.json.symbol);\n\n// Extract holdings WITHOUT duplicating global_cues/fii_dii per holding\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data\n}));\n\n// Extract global cues once, strip raw web search artifacts to reduce payload\nlet globalCues = null;\nif (items.length > 0 && items[0].json.global_cues) {\n  const gc = items[0].json.global_cues;\n  const inner = gc.global_cues || gc;\n  // Extract only the useful text summary, skip raw tool_use data\n  const rawItems = Array.isArray(inner.raw) ? inner.raw : [];\n  const textSummary = rawItems.filter(r => r.type === 'text').map(r => r.text).join('\\n');\n  const searchResults = rawItems\n    .filter(r => r.type === 'web_search_tool_result')\n    .flatMap(r => (r.content || []).map(c => c.title).filter(Boolean))\n    .slice(0, 10);\n\n  globalCues = {\n    summary: textSummary || inner.parse_error || 'No global cues available',\n    sources: searchResults,\n    indices: (gc.global_indices || inner.global_indices || {}).indices || {},\n    collected_at: gc.collected_at || null\n  };\n}\n\nlet fiiDii = null;\nif (items.length > 0 && items[0].json.fii_dii) {\n  const fd = items[0].json.fii_dii;\n  if (fd.fii_dii && fd.fii_dii.error) {\n    fiiDii = { error: 'FII/DII data temporarily unavailable' };\n  } else {\n    fiiDii = fd.fii_dii || fd;\n  }\n}\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: globalCues,\n    fii_dii: fiiDii\n  }\n}];"
                 }
             },
             {
@@ -5267,34 +5267,34 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-19T04:25:28.535Z",
-                "id": 182,
+                "createdAt": "2026-02-19T05:02:16.854Z",
+                "id": 195,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T04:25:29.872Z",
-                "id": 183,
+                "createdAt": "2026-02-19T05:02:19.298Z",
+                "id": 196,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T04:25:33.115Z",
-                "id": 184,
+                "createdAt": "2026-02-19T05:02:22.287Z",
+                "id": 197,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T04:25:34.433Z",
-                "id": 185,
+                "createdAt": "2026-02-19T05:02:23.959Z",
+                "id": 198,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }
