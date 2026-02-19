@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-02-18T14:22:25.823Z",
+  "updatedAt": "2026-02-19T00:28:41.710Z",
   "createdAt": "2026-02-18T07:36:36.580Z",
   "id": "kGn3KwIfHldiwuGW",
   "name": "WF1 \u2014 Message Handler",
@@ -186,7 +186,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE). Extract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|predict|briefing|alerts_list|sync|login|settings|help|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is predict or unknown\"\\n}\\n\\nMap common names: Reliance\u2192RELIANCE, Infosys\u2192INFY, TCS\u2192TCS, HDFC Bank\u2192HDFCBANK, Tata Motors\u2192TATAMOTORS, Wipro\u2192WIPRO, ITC\u2192ITC, SBI\u2192SBIN, Axis Bank\u2192AXISBANK, Kotak\u2192KOTAKBANK, Bajaj Finance\u2192BAJFINANCE, HCL Tech\u2192HCLTECH, Asian Paints\u2192ASIANPAINT, Maruti\u2192MARUTI, Sun Pharma\u2192SUNPHARMA, Titan\u2192TITAN, L&T\u2192LT, Adani\u2192ADANIENT, Bharti Airtel\u2192BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"when will X hit Y\", intent=predict with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\" without a token, intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
       },
       "id": "claude-parse-intent",
       "name": "Claude: Parse Intent",
@@ -205,7 +205,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse Claude's response into structured data\nconst response = $input.first().json;\nlet parsed;\n\ntry {\n  const text = response.content[0].text;\n  // Clean up: remove markdown code fences if present\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch (e) {\n  parsed = {\n    intent: 'unknown',\n    raw_query: $('Prepare User Context').item.json.message_text,\n    parse_error: e.message\n  };\n}\n\n// Merge with user context\nconst ctx = $('Prepare User Context').item.json;\n\nreturn [{\n  json: {\n    ...ctx,\n    intent: parsed.intent,\n    symbol: parsed.symbol ? parsed.symbol.toUpperCase().replace(/[^A-Z0-9&-]/g, '') : null,\n    quantity: parsed.quantity ? parseInt(parsed.quantity) : null,\n    price: parsed.price ? parseFloat(parsed.price) : null,\n    lower_bound: parsed.lower_bound ? parseFloat(parsed.lower_bound) : null,\n    upper_bound: parsed.upper_bound ? parseFloat(parsed.upper_bound) : null,\n    request_token: parsed.request_token || null,\n    raw_query: parsed.raw_query || null\n  }\n}];"
+        "jsCode": "// Parse Claude's response into structured data\nconst response = $input.first().json;\nlet parsed;\n\ntry {\n  const text = response.content[0].text;\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch (e) {\n  parsed = {\n    intent: 'unknown',\n    raw_query: $('Prepare User Context').item.json.message_text,\n    parse_error: e.message\n  };\n}\n\nconst ctx = $('Prepare User Context').item.json;\n\nreturn [{\n  json: {\n    ...ctx,\n    intent: parsed.intent,\n    symbol: parsed.symbol ? parsed.symbol.toUpperCase().replace(/[^A-Z0-9&-]/g, '') : null,\n    quantity: parsed.quantity ? parseInt(parsed.quantity) : null,\n    price: parsed.price ? parseFloat(parsed.price) : null,\n    lower_bound: parsed.lower_bound ? parseFloat(parsed.lower_bound) : null,\n    upper_bound: parsed.upper_bound ? parseFloat(parsed.upper_bound) : null,\n    request_token: parsed.request_token || null,\n    raw_query: parsed.raw_query || parsed.query || null,\n    query: parsed.query || parsed.raw_query || null\n  }\n}];"
       },
       "id": "parse-claude-response",
       "name": "Parse Claude Response",
@@ -338,7 +338,7 @@
                   {
                     "id": "rule-predict",
                     "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
-                    "rightValue": "predict",
+                    "rightValue": "analyze",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -465,6 +465,27 @@
                     "id": "rule-help",
                     "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
                     "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "rule-ask",
+                    "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
+                    "rightValue": "ask",
                     "operator": {
                       "type": "string",
                       "operation": "equals"
@@ -609,14 +630,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format portfolio from holdings data\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0 || !holdings[0].symbol) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n`buy RELIANCE 10 at 2850`' } }];\n}\n\nlet msg = '\ud83d\udcca *Your Portfolio*\\n\\n';\nlet totalInvested = 0;\n\nfor (const h of holdings) {\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  msg += '\u26aa *' + h.symbol + '*\\n';\n  msg += '   ' + h.net_quantity + ' x \u20b9' + h.avg_buy_price + ' = \u20b9' + Math.round(invested).toLocaleString() + '\\n\\n';\n}\n\nmsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n';\nmsg += '\ud83d\udcb0 *Total Invested: \u20b9' + Math.round(totalInvested).toLocaleString() + '*\\n';\nmsg += '\\n_Live prices update with morning briefing_';\n\nreturn [{ json: { message: msg } }];"
+        "jsCode": "// Format portfolio with live Kite prices + P&L\nconst holdings = $('Handle PORTFOLIO').all().map(i => i.json);\n\n// Parse live prices from Kite response\nlet prices = {};\ntry {\n  const raw = $input.first().json;\n  if (raw && raw.status === 'success' && raw.data) {\n    for (const [key, val] of Object.entries(raw.data)) {\n      const sym = key.split(':')[1];\n      prices[sym] = val;\n    }\n  }\n} catch(e) {}\n\nif (holdings.length === 0 || !holdings[0].symbol) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n`buy RELIANCE 10 at 2850`' } }];\n}\n\nconst hasLive = Object.keys(prices).length > 0;\nlet totalInvested = 0, totalCurrent = 0, totalTodayPL = 0;\nlet msg = '\ud83d\udcca *Your Portfolio*' + (hasLive ? ' \ud83d\udd34 Live' : '') + '\\n\\n';\n\nfor (const h of holdings.slice(0, 15)) {\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  const q = prices[h.symbol];\n  const ltp = q && q.last_price;\n\n  if (ltp) {\n    const current = h.net_quantity * ltp;\n    totalCurrent += current;\n    const pl = current - invested;\n    const plPct = (pl / invested * 100).toFixed(1);\n    const plSign = pl >= 0 ? '+' : '-';\n    const plStr = plSign + '\u20b9' + Math.round(Math.abs(pl)).toLocaleString('en-IN');\n    const todayPL = h.net_quantity * (q.change || 0);\n    totalTodayPL += todayPL;\n    const arrow = pl >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n    msg += arrow + ' *' + h.symbol + '*  ' + h.net_quantity + ' @ \u20b9' + h.avg_buy_price + '\\n';\n    msg += '   \u20b9' + ltp.toLocaleString('en-IN') + '  ' + plStr + ' (' + plPct + '%)\\n\\n';\n  } else {\n    msg += '\u26aa *' + h.symbol + '*  ' + h.net_quantity + ' @ \u20b9' + h.avg_buy_price + '\\n';\n    msg += '   Invested: \u20b9' + Math.round(invested).toLocaleString('en-IN') + '\\n\\n';\n  }\n}\n\nif (holdings.length > 15) {\n  msg += '_...and ' + (holdings.length - 15) + ' more positions_\\n\\n';\n}\n\nmsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n';\nmsg += '\ud83d\udcb0 *Invested: \u20b9' + Math.round(totalInvested).toLocaleString('en-IN') + '*\\n';\n\nif (totalCurrent > 0) {\n  const totalPL = totalCurrent - totalInvested;\n  const totalPLPct = (totalPL / totalInvested * 100).toFixed(1);\n  const plSign = totalPL >= 0 ? '+' : '-';\n  const plStr = plSign + '\u20b9' + Math.round(Math.abs(totalPL)).toLocaleString('en-IN');\n  msg += '\ud83d\udcca *Current: \u20b9' + Math.round(totalCurrent).toLocaleString('en-IN') + '*\\n';\n  msg += (totalPL >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9') + ' *P&L: ' + plStr + ' (' + totalPLPct + '%)*\\n';\n  if (totalTodayPL !== 0) {\n    const tSign = totalTodayPL >= 0 ? '+' : '-';\n    msg += '\ud83d\udcc5 *Today: ' + tSign + '\u20b9' + Math.round(Math.abs(totalTodayPL)).toLocaleString('en-IN') + '*\\n';\n  }\n} else if (!hasLive) {\n  msg += '\\n_Live prices unavailable \u2014 Kite session needed_';\n}\n\nconst ctx = $('Parse Claude Response').item.json;\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
       },
       "id": "format-portfolio",
       "name": "Format Portfolio",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2700,
+        2920,
         250
       ]
     },
@@ -634,7 +655,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        2920,
+        3140,
         250
       ],
       "credentials": {
@@ -647,7 +668,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-        "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 view holdings + P&L\n`sync` \u2014 sync from Kite (User 1 only)\n\n\ud83d\udd2e *Analysis*\n`predict RELIANCE 3000`\n`when will TCS hit 4000`\n`briefing` \u2014 morning analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
+        "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 live holdings + P&L\n`sync` \u2014 sync from Kite (User 1)\n\n\ud83d\udd2e *AI Analysis*\n`analyze RELIANCE` \u2014 deep AI analysis\n`analyze TCS 4000` \u2014 analysis with target\n\n\u2753 *Ask Anything*\n`why did Reliance fall?`\n`top 5 losses in my portfolio`\n`what should I sell?`\n`how is my portfolio doing?`\n\n\ud83c\udf05 *Briefing*\n`briefing` \u2014 morning AI analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
         "additionalFields": {
           "parse_mode": "Markdown",
           "appendAttribution": false
@@ -671,7 +692,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-        "text": "={{ '\ud83e\udd14 I didn\\'t quite understand that.\\n\\nYou said: \"' + $('Prepare User Context').item.json.message_text + '\"\\n\\nTry one of these:\\n\u2022 `buy RELIANCE 10 at 2850`\\n\u2022 `alert INFY 1400-1500`\\n\u2022 `portfolio`\\n\u2022 `help` for all commands' }}",
+        "text": "={{ '\ud83e\udd14 I didn\\'t understand that.\\n\\n' + 'You said: \"' + $(\\'Prepare User Context\\').item.json.message_text + '\"\\n\\n' + 'Try:\\n' + '\u2022 `analyze RELIANCE` \u2014 deep AI stock analysis\\n' + '\u2022 `portfolio` \u2014 see holdings with live P&L\\n' + '\u2022 `why did X fall?` \u2014 ask me anything\\n' + '\u2022 `help` \u2014 all commands' }}",
         "additionalFields": {
           "parse_mode": "Markdown",
           "appendAttribution": false
@@ -711,7 +732,7 @@
         "query": "SELECT access_token_encrypted, token_expiry > NOW() as is_valid FROM kite_sessions WHERE user_id = (SELECT id FROM users WHERE is_kite_provider = true LIMIT 1) LIMIT 1"
       },
       "id": "handle-predict",
-      "name": "Get Quote Token",
+      "name": "Get Analyze Token",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
@@ -1038,14 +1059,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// Format prediction/analysis response\nconst symbol = $(\"Parse Claude Response\").item.json.symbol;\nconst ctx = $(\"Parse Claude Response\").item.json;\n\n// Get the quote data from Fetch Kite Quote\nlet quote = {};\ntry {\n  const raw = $input.first().json;\n  // Kite returns: {\"status\": \"success\", \"data\": {\"NSE:SYMBOL\": {...}}}\n  if (raw.status === \"success\" && raw.data) {\n    const key = Object.keys(raw.data)[0];\n    quote = raw.data[key] || {};\n  }\n} catch(e) {}\n\nconst price = quote.last_price || null;\nconst change = quote.change || 0;\nconst changePct = (quote.change / (quote.last_price - quote.change) * 100) || 0;\nconst high = quote.ohlc?.high || null;\nconst low = quote.ohlc?.low || null;\nconst prevClose = quote.ohlc?.close || null;\n\nlet msg = `\ud83d\udd2e *Price Analysis: ${symbol}*\\n\\n`;\n\nif (price) {\n  const arrow = change >= 0 ? \"\ud83d\udcc8\" : \"\ud83d\udcc9\";\n  msg += `${arrow} *\u20b9${price.toLocaleString(\"en-IN\")}*\\n`;\n  if (change !== 0) {\n    const pct = changePct.toFixed(2);\n    msg += `   ${change >= 0 ? \"+\" : \"\"}${change.toFixed(2)} (${change >= 0 ? \"+\" : \"\"}${pct}%)\\n`;\n  }\n  if (high && low) msg += `   Day Range: \u20b9${low} \u2014 \u20b9${high}\\n`;\n  if (prevClose) msg += `   Prev Close: \u20b9${prevClose}\\n`;\n  \n  const target = ctx.upper_bound;\n  if (target) {\n    const diff = ((target - price) / price * 100).toFixed(1);\n    const dir = target > price ? \"upside\" : \"downside\";\n    msg += `\\n\ud83c\udfaf *Target: \u20b9${target}*\\n   ${Math.abs(diff)}% ${dir}\\n`;\n  }\n  \n  msg += `\\n\ud83d\udcca Full AI analysis with technicals & options data arrives in your morning briefing at 8:30 AM.`;\n} else {\n  msg += `\u26a0\ufe0f No live data available for *${symbol || \"unknown\"}*.\\n\\nThis could be because:\\n\u2022 No active Kite session (use \\`login\\`)\\n\u2022 Market is closed\\n\u2022 Invalid symbol name`;\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
+        "jsCode": "// Format deep AI analysis response\nconst symbol = $('Parse Claude Response').item.json.symbol;\nconst ctx = $('Parse Claude Response').item.json;\n\n// Get live quote\nlet quote = {};\ntry {\n  const raw = $('Fetch Kite Quote').first().json;\n  if (raw && raw.status === 'success' && raw.data) {\n    const key = Object.keys(raw.data)[0];\n    quote = raw.data[key] || {};\n  }\n} catch(e) {}\n\n// Get Claude analysis text\nlet analysis = '';\ntry {\n  analysis = $input.first().json.content[0].text;\n} catch(e) {\n  analysis = '\u26a0\ufe0f Analysis unavailable. Try again or check your Kite session.';\n}\n\nlet msg = '';\nconst price = quote.last_price;\nif (price) {\n  const change = quote.change || 0;\n  const prevClose = quote.ohlc && quote.ohlc.close;\n  const changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(2) : '0.00';\n  const arrow = change >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n  msg += arrow + ' *' + symbol + '*  \u20b9' + price.toLocaleString('en-IN') + '\\n';\n  msg += '   ' + (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (change >= 0 ? '+' : '') + changePct + '%)\\n\\n';\n}\n\nmsg += analysis;\n\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
       },
       "id": "format-predict",
-      "name": "Format Prediction",
+      "name": "Format Analysis",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2710,
+        3440,
         400
       ]
     },
@@ -1059,11 +1080,11 @@
         }
       },
       "id": "send-predict",
-      "name": "Send Prediction",
+      "name": "Send Analysis",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        2960,
+        3680,
         400
       ],
       "credentials": {
@@ -1082,7 +1103,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "={{ 'token gifzm9kfars6kr8x:' + $('Get Quote Token').first().json.access_token_encrypted }}"
+              "value": "={ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }"
             },
             {
               "name": "X-Kite-Version",
@@ -1278,6 +1299,219 @@
           "name": "Telegram account"
         }
       }
+    },
+    {
+      "id": "get-portfolio-token",
+      "name": "Get Portfolio Token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2580,
+        250
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT access_token_encrypted, token_expiry > NOW() as is_valid FROM kite_sessions WHERE user_id = (SELECT id FROM users WHERE is_kite_provider = true LIMIT 1) LIMIT 1",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "fetch-portfolio-prices",
+      "name": "Fetch Portfolio Prices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2700,
+        250
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.kite.trade/quote?' + $('Handle PORTFOLIO').all().map(function(i){ return 'i=NSE:' + i.json.symbol; }).join('&') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }"
+            },
+            {
+              "name": "X-Kite-Version",
+              "value": "3"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "fetch-analyze-data",
+      "name": "Fetch Analyze Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2960,
+        400
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT data_type, data FROM staging_data WHERE symbol = $1 AND data_date >= CURRENT_DATE - INTERVAL '1 day' ORDER BY data_date DESC LIMIT 10",
+        "options": {
+          "queryReplacement": "={{ [$('Parse Claude Response').item.json.symbol] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "claude-analyze",
+      "name": "Claude: Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system: 'You are an expert Indian stock market analyst. Provide concise, actionable analysis. Use INR symbol for prices. Keep under 400 words. Format for Telegram with *bold* and emojis.', messages: [{  role: 'user',  content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\n'   + 'Live Quote: ' + JSON.stringify($('Fetch Kite Quote').first().json.data || {}) + '\\n\\n'   + 'Staged Data: ' + JSON.stringify($('Fetch Analyze Data').all().map(function(i){ return i.json; })) + '\\n\\n'   + 'User target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none') + '\\n\\n'   + 'Provide: 1) Current trend & momentum 2) Key support/resistance 3) Technical signals (RSI/MACD if available) 4) AI verdict (Bullish/Bearish/Neutral) with reasoning 5) Near-term price target range.' }]}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "id": "fetch-ask-context",
+      "name": "Fetch Ask Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2460,
+        580
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested, (SELECT data FROM staging_data WHERE symbol = h.symbol  ORDER BY data_date DESC LIMIT 1) as latest_data FROM holdings h WHERE h.user_id = $1 ORDER BY h.total_invested DESC LIMIT 15",
+        "options": {
+          "queryReplacement": "={{ [$('Parse Claude Response').item.json.user_id] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "claude-ask",
+      "name": "Claude: Ask",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2700,
+        580
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, system: 'You are an expert Indian stock market assistant. The user has asked a question about their portfolio or the market. Answer concisely and helpfully. Use INR symbol for prices. Format for Telegram with *bold* and emojis. Keep under 300 words.', messages: [{  role: 'user',  content: 'Question: ' + $('Parse Claude Response').item.json.query + '\\n\\n'   + 'My portfolio: ' + JSON.stringify($input.all().map(function(i){ return { symbol: i.json.symbol, qty: i.json.net_quantity, avg: i.json.avg_buy_price, invested: i.json.total_invested }; })) + '\\n\\n'   + 'Please answer the question. If it is about a specific stock, use the portfolio data. If asking about losses/gains, calculate from avg price vs any available data.' }]}) }}"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
+        }
+      }
+    },
+    {
+      "id": "format-ask",
+      "name": "Format Ask Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2940,
+        580
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  answer = $input.first().json.content[0].text;\n} catch(e) {\n  answer = \"Sorry, I couldn't process that question. Try rephrasing or use `help` for commands.\";\n}\nreturn [{ json: { chat_id: ctx.chat_id, message: answer } }];"
+      }
+    },
+    {
+      "id": "send-ask",
+      "name": "Send Ask Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3180,
+        580
+      ],
+      "parameters": {
+        "chatId": "={{ $('Format Ask Response').item.json.chat_id }}",
+        "text": "={{ $('Format Ask Response').item.json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
   "connections": {
@@ -1426,7 +1660,7 @@
         ],
         [
           {
-            "node": "Get Quote Token",
+            "node": "Get Analyze Token",
             "type": "main",
             "index": 0
           }
@@ -1479,6 +1713,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Fetch Ask Context",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1497,7 +1738,7 @@
       "main": [
         [
           {
-            "node": "Format Portfolio",
+            "node": "Get Portfolio Token",
             "type": "main",
             "index": 0
           }
@@ -1621,33 +1862,11 @@
         ]
       ]
     },
-    "Format Prediction": {
-      "main": [
-        [
-          {
-            "node": "Send Prediction",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Quote Token": {
-      "main": [
-        [
-          {
-            "node": "Fetch Kite Quote",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Fetch Kite Quote": {
       "main": [
         [
           {
-            "node": "Format Prediction",
+            "node": "Fetch Analyze Data",
             "type": "main",
             "index": 0
           }
@@ -1726,6 +1945,105 @@
           }
         ]
       ]
+    },
+    "Get Portfolio Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Portfolio Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Portfolio Prices": {
+      "main": [
+        [
+          {
+            "node": "Format Portfolio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Analyze Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Kite Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Analyze Data": {
+      "main": [
+        [
+          {
+            "node": "Claude: Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Analyze": {
+      "main": [
+        [
+          {
+            "node": "Format Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Analysis": {
+      "main": [
+        [
+          {
+            "node": "Send Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Ask Context": {
+      "main": [
+        [
+          {
+            "node": "Claude: Ask",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Ask": {
+      "main": [
+        [
+          {
+            "node": "Format Ask Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Ask Response": {
+      "main": [
+        [
+          {
+            "node": "Send Ask Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1736,35 +2054,15 @@
   "staticData": null,
   "meta": null,
   "pinData": null,
-  "versionId": "d02f9c52-5f8f-4e02-adc3-f9b2cc8222b3",
-  "activeVersionId": "d02f9c52-5f8f-4e02-adc3-f9b2cc8222b3",
-  "versionCounter": 100,
+  "versionId": "9c3d2261-7257-46b8-90cb-04b38a51b9a9",
+  "activeVersionId": "9c3d2261-7257-46b8-90cb-04b38a51b9a9",
+  "versionCounter": 101,
   "triggerCount": 1,
-  "shared": [
-    {
-      "updatedAt": "2026-02-18T07:36:36.580Z",
-      "createdAt": "2026-02-18T07:36:36.580Z",
-      "role": "workflow:owner",
-      "workflowId": "kGn3KwIfHldiwuGW",
-      "projectId": "qJqZAaC2LCOkdDc2",
-      "project": {
-        "updatedAt": "2026-02-17T17:30:11.422Z",
-        "createdAt": "2026-02-17T17:24:57.957Z",
-        "id": "qJqZAaC2LCOkdDc2",
-        "name": "Vipindas S <mail2vdas@gmail.com>",
-        "type": "personal",
-        "icon": null,
-        "description": null,
-        "creatorId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
-      }
-    }
-  ],
   "tags": [],
-  "parentFolder": null,
   "activeVersion": {
-    "updatedAt": "2026-02-18T14:22:25.828Z",
-    "createdAt": "2026-02-18T14:22:25.828Z",
-    "versionId": "d02f9c52-5f8f-4e02-adc3-f9b2cc8222b3",
+    "updatedAt": "2026-02-19T00:28:41.712Z",
+    "createdAt": "2026-02-19T00:28:41.712Z",
+    "versionId": "9c3d2261-7257-46b8-90cb-04b38a51b9a9",
     "workflowId": "kGn3KwIfHldiwuGW",
     "nodes": [
       {
@@ -1946,7 +2244,7 @@
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE). Extract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|predict|briefing|alerts_list|sync|login|settings|help|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is predict or unknown\"\\n}\\n\\nMap common names: Reliance\u2192RELIANCE, Infosys\u2192INFY, TCS\u2192TCS, HDFC Bank\u2192HDFCBANK, Tata Motors\u2192TATAMOTORS, Wipro\u2192WIPRO, ITC\u2192ITC, SBI\u2192SBIN, Axis Bank\u2192AXISBANK, Kotak\u2192KOTAKBANK, Bajaj Finance\u2192BAJFINANCE, HCL Tech\u2192HCLTECH, Asian Paints\u2192ASIANPAINT, Maruti\u2192MARUTI, Sun Pharma\u2192SUNPHARMA, Titan\u2192TITAN, L&T\u2192LT, Adani\u2192ADANIENT, Bharti Airtel\u2192BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"when will X hit Y\", intent=predict with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\" without a token, intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
         },
         "id": "claude-parse-intent",
         "name": "Claude: Parse Intent",
@@ -1965,7 +2263,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Parse Claude's response into structured data\nconst response = $input.first().json;\nlet parsed;\n\ntry {\n  const text = response.content[0].text;\n  // Clean up: remove markdown code fences if present\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch (e) {\n  parsed = {\n    intent: 'unknown',\n    raw_query: $('Prepare User Context').item.json.message_text,\n    parse_error: e.message\n  };\n}\n\n// Merge with user context\nconst ctx = $('Prepare User Context').item.json;\n\nreturn [{\n  json: {\n    ...ctx,\n    intent: parsed.intent,\n    symbol: parsed.symbol ? parsed.symbol.toUpperCase().replace(/[^A-Z0-9&-]/g, '') : null,\n    quantity: parsed.quantity ? parseInt(parsed.quantity) : null,\n    price: parsed.price ? parseFloat(parsed.price) : null,\n    lower_bound: parsed.lower_bound ? parseFloat(parsed.lower_bound) : null,\n    upper_bound: parsed.upper_bound ? parseFloat(parsed.upper_bound) : null,\n    request_token: parsed.request_token || null,\n    raw_query: parsed.raw_query || null\n  }\n}];"
+          "jsCode": "// Parse Claude's response into structured data\nconst response = $input.first().json;\nlet parsed;\n\ntry {\n  const text = response.content[0].text;\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch (e) {\n  parsed = {\n    intent: 'unknown',\n    raw_query: $('Prepare User Context').item.json.message_text,\n    parse_error: e.message\n  };\n}\n\nconst ctx = $('Prepare User Context').item.json;\n\nreturn [{\n  json: {\n    ...ctx,\n    intent: parsed.intent,\n    symbol: parsed.symbol ? parsed.symbol.toUpperCase().replace(/[^A-Z0-9&-]/g, '') : null,\n    quantity: parsed.quantity ? parseInt(parsed.quantity) : null,\n    price: parsed.price ? parseFloat(parsed.price) : null,\n    lower_bound: parsed.lower_bound ? parseFloat(parsed.lower_bound) : null,\n    upper_bound: parsed.upper_bound ? parseFloat(parsed.upper_bound) : null,\n    request_token: parsed.request_token || null,\n    raw_query: parsed.raw_query || parsed.query || null,\n    query: parsed.query || parsed.raw_query || null\n  }\n}];"
         },
         "id": "parse-claude-response",
         "name": "Parse Claude Response",
@@ -2098,7 +2396,7 @@
                     {
                       "id": "rule-predict",
                       "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
-                      "rightValue": "predict",
+                      "rightValue": "analyze",
                       "operator": {
                         "type": "string",
                         "operation": "equals"
@@ -2225,6 +2523,27 @@
                       "id": "rule-help",
                       "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
                       "rightValue": "help",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                }
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "id": "rule-ask",
+                      "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
+                      "rightValue": "ask",
                       "operator": {
                         "type": "string",
                         "operation": "equals"
@@ -2369,14 +2688,14 @@
       },
       {
         "parameters": {
-          "jsCode": "// Format portfolio from holdings data\nconst holdings = $input.all().map(i => i.json);\n\nif (holdings.length === 0 || !holdings[0].symbol) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n`buy RELIANCE 10 at 2850`' } }];\n}\n\nlet msg = '\ud83d\udcca *Your Portfolio*\\n\\n';\nlet totalInvested = 0;\n\nfor (const h of holdings) {\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  msg += '\u26aa *' + h.symbol + '*\\n';\n  msg += '   ' + h.net_quantity + ' x \u20b9' + h.avg_buy_price + ' = \u20b9' + Math.round(invested).toLocaleString() + '\\n\\n';\n}\n\nmsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n';\nmsg += '\ud83d\udcb0 *Total Invested: \u20b9' + Math.round(totalInvested).toLocaleString() + '*\\n';\nmsg += '\\n_Live prices update with morning briefing_';\n\nreturn [{ json: { message: msg } }];"
+          "jsCode": "// Format portfolio with live Kite prices + P&L\nconst holdings = $('Handle PORTFOLIO').all().map(i => i.json);\n\n// Parse live prices from Kite response\nlet prices = {};\ntry {\n  const raw = $input.first().json;\n  if (raw && raw.status === 'success' && raw.data) {\n    for (const [key, val] of Object.entries(raw.data)) {\n      const sym = key.split(':')[1];\n      prices[sym] = val;\n    }\n  }\n} catch(e) {}\n\nif (holdings.length === 0 || !holdings[0].symbol) {\n  return [{ json: { message: '\ud83d\udced *No holdings found*\\n\\nStart by logging a trade:\\n`buy RELIANCE 10 at 2850`' } }];\n}\n\nconst hasLive = Object.keys(prices).length > 0;\nlet totalInvested = 0, totalCurrent = 0, totalTodayPL = 0;\nlet msg = '\ud83d\udcca *Your Portfolio*' + (hasLive ? ' \ud83d\udd34 Live' : '') + '\\n\\n';\n\nfor (const h of holdings.slice(0, 15)) {\n  const invested = h.net_quantity * h.avg_buy_price;\n  totalInvested += invested;\n  const q = prices[h.symbol];\n  const ltp = q && q.last_price;\n\n  if (ltp) {\n    const current = h.net_quantity * ltp;\n    totalCurrent += current;\n    const pl = current - invested;\n    const plPct = (pl / invested * 100).toFixed(1);\n    const plSign = pl >= 0 ? '+' : '-';\n    const plStr = plSign + '\u20b9' + Math.round(Math.abs(pl)).toLocaleString('en-IN');\n    const todayPL = h.net_quantity * (q.change || 0);\n    totalTodayPL += todayPL;\n    const arrow = pl >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n    msg += arrow + ' *' + h.symbol + '*  ' + h.net_quantity + ' @ \u20b9' + h.avg_buy_price + '\\n';\n    msg += '   \u20b9' + ltp.toLocaleString('en-IN') + '  ' + plStr + ' (' + plPct + '%)\\n\\n';\n  } else {\n    msg += '\u26aa *' + h.symbol + '*  ' + h.net_quantity + ' @ \u20b9' + h.avg_buy_price + '\\n';\n    msg += '   Invested: \u20b9' + Math.round(invested).toLocaleString('en-IN') + '\\n\\n';\n  }\n}\n\nif (holdings.length > 15) {\n  msg += '_...and ' + (holdings.length - 15) + ' more positions_\\n\\n';\n}\n\nmsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n';\nmsg += '\ud83d\udcb0 *Invested: \u20b9' + Math.round(totalInvested).toLocaleString('en-IN') + '*\\n';\n\nif (totalCurrent > 0) {\n  const totalPL = totalCurrent - totalInvested;\n  const totalPLPct = (totalPL / totalInvested * 100).toFixed(1);\n  const plSign = totalPL >= 0 ? '+' : '-';\n  const plStr = plSign + '\u20b9' + Math.round(Math.abs(totalPL)).toLocaleString('en-IN');\n  msg += '\ud83d\udcca *Current: \u20b9' + Math.round(totalCurrent).toLocaleString('en-IN') + '*\\n';\n  msg += (totalPL >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9') + ' *P&L: ' + plStr + ' (' + totalPLPct + '%)*\\n';\n  if (totalTodayPL !== 0) {\n    const tSign = totalTodayPL >= 0 ? '+' : '-';\n    msg += '\ud83d\udcc5 *Today: ' + tSign + '\u20b9' + Math.round(Math.abs(totalTodayPL)).toLocaleString('en-IN') + '*\\n';\n  }\n} else if (!hasLive) {\n  msg += '\\n_Live prices unavailable \u2014 Kite session needed_';\n}\n\nconst ctx = $('Parse Claude Response').item.json;\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
         },
         "id": "format-portfolio",
         "name": "Format Portfolio",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2700,
+          2920,
           250
         ]
       },
@@ -2394,7 +2713,7 @@
         "type": "n8n-nodes-base.telegram",
         "typeVersion": 1.2,
         "position": [
-          2920,
+          3140,
           250
         ],
         "credentials": {
@@ -2407,7 +2726,7 @@
       {
         "parameters": {
           "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-          "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 view holdings + P&L\n`sync` \u2014 sync from Kite (User 1 only)\n\n\ud83d\udd2e *Analysis*\n`predict RELIANCE 3000`\n`when will TCS hit 4000`\n`briefing` \u2014 morning analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
+          "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 live holdings + P&L\n`sync` \u2014 sync from Kite (User 1)\n\n\ud83d\udd2e *AI Analysis*\n`analyze RELIANCE` \u2014 deep AI analysis\n`analyze TCS 4000` \u2014 analysis with target\n\n\u2753 *Ask Anything*\n`why did Reliance fall?`\n`top 5 losses in my portfolio`\n`what should I sell?`\n`how is my portfolio doing?`\n\n\ud83c\udf05 *Briefing*\n`briefing` \u2014 morning AI analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
           "additionalFields": {
             "parse_mode": "Markdown",
             "appendAttribution": false
@@ -2431,7 +2750,7 @@
       {
         "parameters": {
           "chatId": "={{ $('Prepare User Context').item.json.chat_id }}",
-          "text": "={{ '\ud83e\udd14 I didn\\'t quite understand that.\\n\\nYou said: \"' + $('Prepare User Context').item.json.message_text + '\"\\n\\nTry one of these:\\n\u2022 `buy RELIANCE 10 at 2850`\\n\u2022 `alert INFY 1400-1500`\\n\u2022 `portfolio`\\n\u2022 `help` for all commands' }}",
+          "text": "={{ '\ud83e\udd14 I didn\\'t understand that.\\n\\n' + 'You said: \"' + $(\\'Prepare User Context\\').item.json.message_text + '\"\\n\\n' + 'Try:\\n' + '\u2022 `analyze RELIANCE` \u2014 deep AI stock analysis\\n' + '\u2022 `portfolio` \u2014 see holdings with live P&L\\n' + '\u2022 `why did X fall?` \u2014 ask me anything\\n' + '\u2022 `help` \u2014 all commands' }}",
           "additionalFields": {
             "parse_mode": "Markdown",
             "appendAttribution": false
@@ -2471,7 +2790,7 @@
           "query": "SELECT access_token_encrypted, token_expiry > NOW() as is_valid FROM kite_sessions WHERE user_id = (SELECT id FROM users WHERE is_kite_provider = true LIMIT 1) LIMIT 1"
         },
         "id": "handle-predict",
-        "name": "Get Quote Token",
+        "name": "Get Analyze Token",
         "type": "n8n-nodes-base.postgres",
         "typeVersion": 2.5,
         "position": [
@@ -2798,14 +3117,14 @@
       },
       {
         "parameters": {
-          "jsCode": "// Format prediction/analysis response\nconst symbol = $(\"Parse Claude Response\").item.json.symbol;\nconst ctx = $(\"Parse Claude Response\").item.json;\n\n// Get the quote data from Fetch Kite Quote\nlet quote = {};\ntry {\n  const raw = $input.first().json;\n  // Kite returns: {\"status\": \"success\", \"data\": {\"NSE:SYMBOL\": {...}}}\n  if (raw.status === \"success\" && raw.data) {\n    const key = Object.keys(raw.data)[0];\n    quote = raw.data[key] || {};\n  }\n} catch(e) {}\n\nconst price = quote.last_price || null;\nconst change = quote.change || 0;\nconst changePct = (quote.change / (quote.last_price - quote.change) * 100) || 0;\nconst high = quote.ohlc?.high || null;\nconst low = quote.ohlc?.low || null;\nconst prevClose = quote.ohlc?.close || null;\n\nlet msg = `\ud83d\udd2e *Price Analysis: ${symbol}*\\n\\n`;\n\nif (price) {\n  const arrow = change >= 0 ? \"\ud83d\udcc8\" : \"\ud83d\udcc9\";\n  msg += `${arrow} *\u20b9${price.toLocaleString(\"en-IN\")}*\\n`;\n  if (change !== 0) {\n    const pct = changePct.toFixed(2);\n    msg += `   ${change >= 0 ? \"+\" : \"\"}${change.toFixed(2)} (${change >= 0 ? \"+\" : \"\"}${pct}%)\\n`;\n  }\n  if (high && low) msg += `   Day Range: \u20b9${low} \u2014 \u20b9${high}\\n`;\n  if (prevClose) msg += `   Prev Close: \u20b9${prevClose}\\n`;\n  \n  const target = ctx.upper_bound;\n  if (target) {\n    const diff = ((target - price) / price * 100).toFixed(1);\n    const dir = target > price ? \"upside\" : \"downside\";\n    msg += `\\n\ud83c\udfaf *Target: \u20b9${target}*\\n   ${Math.abs(diff)}% ${dir}\\n`;\n  }\n  \n  msg += `\\n\ud83d\udcca Full AI analysis with technicals & options data arrives in your morning briefing at 8:30 AM.`;\n} else {\n  msg += `\u26a0\ufe0f No live data available for *${symbol || \"unknown\"}*.\\n\\nThis could be because:\\n\u2022 No active Kite session (use \\`login\\`)\\n\u2022 Market is closed\\n\u2022 Invalid symbol name`;\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
+          "jsCode": "// Format deep AI analysis response\nconst symbol = $('Parse Claude Response').item.json.symbol;\nconst ctx = $('Parse Claude Response').item.json;\n\n// Get live quote\nlet quote = {};\ntry {\n  const raw = $('Fetch Kite Quote').first().json;\n  if (raw && raw.status === 'success' && raw.data) {\n    const key = Object.keys(raw.data)[0];\n    quote = raw.data[key] || {};\n  }\n} catch(e) {}\n\n// Get Claude analysis text\nlet analysis = '';\ntry {\n  analysis = $input.first().json.content[0].text;\n} catch(e) {\n  analysis = '\u26a0\ufe0f Analysis unavailable. Try again or check your Kite session.';\n}\n\nlet msg = '';\nconst price = quote.last_price;\nif (price) {\n  const change = quote.change || 0;\n  const prevClose = quote.ohlc && quote.ohlc.close;\n  const changePct = prevClose ? ((price - prevClose) / prevClose * 100).toFixed(2) : '0.00';\n  const arrow = change >= 0 ? '\ud83d\udcc8' : '\ud83d\udcc9';\n  msg += arrow + ' *' + symbol + '*  \u20b9' + price.toLocaleString('en-IN') + '\\n';\n  msg += '   ' + (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (change >= 0 ? '+' : '') + changePct + '%)\\n\\n';\n}\n\nmsg += analysis;\n\nreturn [{ json: { chat_id: ctx.chat_id, message: msg } }];"
         },
         "id": "format-predict",
-        "name": "Format Prediction",
+        "name": "Format Analysis",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [
-          2710,
+          3440,
           400
         ]
       },
@@ -2819,11 +3138,11 @@
           }
         },
         "id": "send-predict",
-        "name": "Send Prediction",
+        "name": "Send Analysis",
         "type": "n8n-nodes-base.telegram",
         "typeVersion": 1.2,
         "position": [
-          2960,
+          3680,
           400
         ],
         "credentials": {
@@ -2842,7 +3161,7 @@
             "parameters": [
               {
                 "name": "Authorization",
-                "value": "={{ 'token gifzm9kfars6kr8x:' + $('Get Quote Token').first().json.access_token_encrypted }}"
+                "value": "={ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }"
               },
               {
                 "name": "X-Kite-Version",
@@ -3038,6 +3357,219 @@
             "name": "Telegram account"
           }
         }
+      },
+      {
+        "id": "get-portfolio-token",
+        "name": "Get Portfolio Token",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2580,
+          250
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT access_token_encrypted, token_expiry > NOW() as is_valid FROM kite_sessions WHERE user_id = (SELECT id FROM users WHERE is_kite_provider = true LIMIT 1) LIMIT 1",
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "6dSdIQ2xAFPzyEwe",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "fetch-portfolio-prices",
+        "name": "Fetch Portfolio Prices",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2700,
+          250
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "={{ 'https://api.kite.trade/quote?' + $('Handle PORTFOLIO').all().map(function(i){ return 'i=NSE:' + i.json.symbol; }).join('&') }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "={ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }"
+              },
+              {
+                "name": "X-Kite-Version",
+                "value": "3"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "fetch-analyze-data",
+        "name": "Fetch Analyze Data",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2960,
+          400
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT data_type, data FROM staging_data WHERE symbol = $1 AND data_date >= CURRENT_DATE - INTERVAL '1 day' ORDER BY data_date DESC LIMIT 10",
+          "options": {
+            "queryReplacement": "={{ [$('Parse Claude Response').item.json.symbol] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "6dSdIQ2xAFPzyEwe",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "claude-analyze",
+        "name": "Claude: Analyze",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          3200,
+          400
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system: 'You are an expert Indian stock market analyst. Provide concise, actionable analysis. Use INR symbol for prices. Keep under 400 words. Format for Telegram with *bold* and emojis.', messages: [{  role: 'user',  content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\n'   + 'Live Quote: ' + JSON.stringify($('Fetch Kite Quote').first().json.data || {}) + '\\n\\n'   + 'Staged Data: ' + JSON.stringify($('Fetch Analyze Data').all().map(function(i){ return i.json; })) + '\\n\\n'   + 'User target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none') + '\\n\\n'   + 'Provide: 1) Current trend & momentum 2) Key support/resistance 3) Technical signals (RSI/MACD if available) 4) AI verdict (Bullish/Bearish/Neutral) with reasoning 5) Near-term price target range.' }]}) }}"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "Idkjo6pmv2QE4urQ",
+            "name": "Anthropic Header Auth"
+          }
+        }
+      },
+      {
+        "id": "fetch-ask-context",
+        "name": "Fetch Ask Context",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2460,
+          580
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT h.symbol, h.net_quantity, h.avg_buy_price, h.total_invested, (SELECT data FROM staging_data WHERE symbol = h.symbol  ORDER BY data_date DESC LIMIT 1) as latest_data FROM holdings h WHERE h.user_id = $1 ORDER BY h.total_invested DESC LIMIT 15",
+          "options": {
+            "queryReplacement": "={{ [$('Parse Claude Response').item.json.user_id] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "6dSdIQ2xAFPzyEwe",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "claude-ask",
+        "name": "Claude: Ask",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          2700,
+          580
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 600, system: 'You are an expert Indian stock market assistant. The user has asked a question about their portfolio or the market. Answer concisely and helpfully. Use INR symbol for prices. Format for Telegram with *bold* and emojis. Keep under 300 words.', messages: [{  role: 'user',  content: 'Question: ' + $('Parse Claude Response').item.json.query + '\\n\\n'   + 'My portfolio: ' + JSON.stringify($input.all().map(function(i){ return { symbol: i.json.symbol, qty: i.json.net_quantity, avg: i.json.avg_buy_price, invested: i.json.total_invested }; })) + '\\n\\n'   + 'Please answer the question. If it is about a specific stock, use the portfolio data. If asking about losses/gains, calculate from avg price vs any available data.' }]}) }}"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "Idkjo6pmv2QE4urQ",
+            "name": "Anthropic Header Auth"
+          }
+        }
+      },
+      {
+        "id": "format-ask",
+        "name": "Format Ask Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2940,
+          580
+        ],
+        "parameters": {
+          "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  answer = $input.first().json.content[0].text;\n} catch(e) {\n  answer = \"Sorry, I couldn't process that question. Try rephrasing or use `help` for commands.\";\n}\nreturn [{ json: { chat_id: ctx.chat_id, message: answer } }];"
+        }
+      },
+      {
+        "id": "send-ask",
+        "name": "Send Ask Response",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          3180,
+          580
+        ],
+        "parameters": {
+          "chatId": "={{ $('Format Ask Response').item.json.chat_id }}",
+          "text": "={{ $('Format Ask Response').item.json.message }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "oh2jj2bRbyNVQvgB",
+            "name": "Telegram account"
+          }
+        }
       }
     ],
     "connections": {
@@ -3186,7 +3718,7 @@
           ],
           [
             {
-              "node": "Get Quote Token",
+              "node": "Get Analyze Token",
               "type": "main",
               "index": 0
             }
@@ -3239,6 +3771,13 @@
               "type": "main",
               "index": 0
             }
+          ],
+          [
+            {
+              "node": "Fetch Ask Context",
+              "type": "main",
+              "index": 0
+            }
           ]
         ]
       },
@@ -3257,7 +3796,7 @@
         "main": [
           [
             {
-              "node": "Format Portfolio",
+              "node": "Get Portfolio Token",
               "type": "main",
               "index": 0
             }
@@ -3381,33 +3920,11 @@
           ]
         ]
       },
-      "Format Prediction": {
-        "main": [
-          [
-            {
-              "node": "Send Prediction",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Get Quote Token": {
-        "main": [
-          [
-            {
-              "node": "Fetch Kite Quote",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
       "Fetch Kite Quote": {
         "main": [
           [
             {
-              "node": "Format Prediction",
+              "node": "Fetch Analyze Data",
               "type": "main",
               "index": 0
             }
@@ -3486,35 +4003,110 @@
             }
           ]
         ]
+      },
+      "Get Portfolio Token": {
+        "main": [
+          [
+            {
+              "node": "Fetch Portfolio Prices",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Portfolio Prices": {
+        "main": [
+          [
+            {
+              "node": "Format Portfolio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Analyze Token": {
+        "main": [
+          [
+            {
+              "node": "Fetch Kite Quote",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Analyze Data": {
+        "main": [
+          [
+            {
+              "node": "Claude: Analyze",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude: Analyze": {
+        "main": [
+          [
+            {
+              "node": "Format Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Analysis": {
+        "main": [
+          [
+            {
+              "node": "Send Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Ask Context": {
+        "main": [
+          [
+            {
+              "node": "Claude: Ask",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude: Ask": {
+        "main": [
+          [
+            {
+              "node": "Format Ask Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Ask Response": {
+        "main": [
+          [
+            {
+              "node": "Send Ask Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "authors": "Vipindas S",
     "name": null,
     "description": null,
-    "autosaved": false,
-    "workflowPublishHistory": [
-      {
-        "createdAt": "2026-02-18T14:22:29.011Z",
-        "id": 150,
-        "workflowId": "kGn3KwIfHldiwuGW",
-        "versionId": "d02f9c52-5f8f-4e02-adc3-f9b2cc8222b3",
-        "event": "activated",
-        "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
-      }
-    ]
-  },
-  "scopes": [
-    "workflow:create",
-    "workflow:delete",
-    "workflow:execute",
-    "workflow:execute-chat",
-    "workflow:list",
-    "workflow:move",
-    "workflow:publish",
-    "workflow:read",
-    "workflow:share",
-    "workflow:unpublish",
-    "workflow:update"
-  ],
-  "checksum": "d0aa619efe4d3c91595ba1c090ef6f9cfbb1d945f323cf353c2b9536d03791aa"
+    "autosaved": false
+  }
 }
