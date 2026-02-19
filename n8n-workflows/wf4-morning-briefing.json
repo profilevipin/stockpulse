@@ -1,275 +1,607 @@
 {
-  "name": "WF4 - Morning Briefing Synthesis",
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "30 8 * * 1-5"
+    "updatedAt": "2026-02-19T03:35:12.843Z",
+    "createdAt": "2026-02-17T17:48:41.845Z",
+    "id": "NYoURGSYiDNdpP3Q",
+    "name": "WF4 - Morning Briefing Synthesis",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "30 8 * * 1-5"
+                        }
+                    ]
+                }
+            },
+            "id": "cron-830am",
+            "name": "8:30 AM Mon-Fri",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT data_type, symbol, data FROM staging_data WHERE data_date = CURRENT_DATE ORDER BY data_type"
+            },
+            "id": "read-all-staging",
+            "name": "Read All Staging Data",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                440,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
             }
-          ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id, u.settings, json_agg(json_build_object('symbol', h.symbol, 'qty', h.net_quantity, 'avg_price', h.avg_buy_price, 'invested', h.total_invested)) AS holdings FROM users u LEFT JOIN holdings h ON u.id = h.user_id AND h.net_quantity > 0 WHERE u.is_active = true GROUP BY u.id"
+            },
+            "id": "get-users-holdings",
+            "name": "Get Users & Holdings",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                440,
+                500
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT user_id, symbol, lower_bound, upper_bound, status FROM alerts WHERE status = 'active'"
+            },
+            "id": "get-active-alerts",
+            "name": "Get Active Alerts",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                440,
+                700
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Assemble comprehensive context per user for Claude briefing\nconst stagingData = $('Read All Staging Data').all().map(i => i.json);\nconst users = $('Get Users & Holdings').all().map(i => i.json);\nconst allAlerts = $('Get Active Alerts').all().map(i => i.json);\n\n// Organize staging data by type\nconst staged = {};\nfor (const row of stagingData) {\n  const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;\n  if (row.symbol) {\n    if (!staged[row.data_type]) staged[row.data_type] = {};\n    staged[row.data_type][row.symbol] = data;\n  } else {\n    staged[row.data_type] = data;\n  }\n}\n\n// Generate personalized briefing request per user\nconst briefingRequests = [];\n\nfor (const user of users) {\n  const userAlerts = allAlerts.filter(a => a.user_id === user.user_id);\n  const holdings = user.holdings || [];\n  \n  // Build per-stock technical data\n  const stockAnalysis = [];\n  for (const h of holdings) {\n    if (!h.symbol) continue;\n    const tech = staged.technicals?.[h.symbol] || null;\n    const sentiment = (staged.options_news?.news_sentiment || [])\n      .find(s => s.symbol === h.symbol);\n    const alert = userAlerts.find(a => a.symbol === h.symbol);\n    \n    stockAnalysis.push({\n      symbol: h.symbol,\n      quantity: h.qty,\n      avg_buy_price: h.avg_price,\n      invested: h.invested,\n      technicals: tech,\n      sentiment: sentiment || null,\n      alert: alert || null\n    });\n  }\n\n  const context = {\n    user_name: user.display_name,\n    global_cues: staged.global_cues || {},\n    fii_dii: staged.fii_dii || {},\n    nifty_options: staged.options_news?.nifty_options || {},\n    corporate_actions: staged.options_news?.corporate_actions || {},\n    news_headlines: staged.options_news?.news_articles || [],\n    stock_analysis: stockAnalysis,\n    active_alerts_count: userAlerts.length\n  };\n\n  briefingRequests.push({\n    user_id: user.user_id,\n    chat_id: user.alerts_chat_id || user.private_chat_id,\n    display_name: user.display_name,\n    context: context\n  });\n}\n\nreturn briefingRequests.map(r => ({ json: r }));"
+            },
+            "id": "assemble-context",
+            "name": "Assemble Per-User Context",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.anthropic.com/v1/messages",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "anthropic-version",
+                            "value": "2023-06-01"
+                        },
+                        {
+                            "name": "content-type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized morning briefing in Telegram markdown format (use * for bold). Keep it 400-500 words max.\\n\\nStructure:\\n1. \ud83c\udf0d MARKET PULSE (3 lines): Global overnight summary + FII/DII signal + NIFTY PCR & expected range\\n2. \ud83d\udcca STOCK-BY-STOCK (for each holding):\\n   - Technical (1 line): trend + key indicator\\n   - Flow (1 line): FII/DII context\\n   - News (1 line): sentiment + headline if notable\\n   - Options (1 line): if F&O stock \u2014 OI buildup\\n   - Alert distance: X% from upper/lower\\n   - Action: specific trigger for today\\n3. \ud83c\udfaf TODAY\\'S SCENARIOS: Bullish / Bearish / Most Likely cases (2-3 lines each)\\n4. \u26a1 TOP 2 ACTIONS: Specific actionable triggers with price levels\\n5. \u26a0\ufe0f RISK FLAGS: Overbought/oversold, unusual patterns, upcoming events\\n\\nEnd with: \u26a0\ufe0f Technical + flow analysis only. Not financial advice.\\n\\nBe specific with numbers. Use \u20b9 for prices. Use \ud83d\udfe2\ud83d\udd34\u26a1\u26a0\ufe0f emojis sparingly.', messages: [{ role: 'user', content: 'Generate morning briefing for ' + $json.display_name + ':\\n\\n' + JSON.stringify($json.context, null, 2) }] }) }}"
+            },
+            "id": "claude-briefing",
+            "name": "Claude: Generate Briefing",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1000,
+                500
+            ],
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "Idkjo6pmv2QE4urQ",
+                    "name": "Anthropic Header Auth"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract briefing text from Claude response\nconst response = $input.first().json;\nconst briefing = response.content\n  .filter(c => c.type === 'text')\n  .map(c => c.text)\n  .join('');\n\n// Telegram max message is 4096 chars \u2014 split if needed\nconst chatId = $('Assemble Per-User Context').item.json.chat_id;\nconst messages = [];\n\nif (briefing.length <= 4096) {\n  messages.push({ chat_id: chatId, text: briefing });\n} else {\n  // Split at paragraph boundaries\n  const parts = briefing.match(/[\\s\\S]{1,4000}(?=\\n|$)/g) || [briefing];\n  for (const part of parts) {\n    messages.push({ chat_id: chatId, text: part.trim() });\n  }\n}\n\nreturn messages.map(m => ({ json: m }));"
+            },
+            "id": "format-briefing",
+            "name": "Format Briefing",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1220,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "chatId": "={{ $json.chat_id }}",
+                "text": "={{ $json.text }}",
+                "additionalFields": {
+                    "parse_mode": "Markdown",
+                    "appendAttribution": false
+                }
+            },
+            "id": "send-briefing",
+            "name": "Send Briefing",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1.2,
+            "position": [
+                1440,
+                500
+            ],
+            "credentials": {
+                "telegramApi": {
+                    "id": "oh2jj2bRbyNVQvgB",
+                    "name": "Telegram account"
+                }
+            }
         }
-      },
-      "id": "cron-830am",
-      "name": "8:30 AM Mon-Fri",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        220,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT data_type, symbol, data FROM staging_data WHERE data_date = CURRENT_DATE ORDER BY data_type"
-      },
-      "id": "read-all-staging",
-      "name": "Read All Staging Data",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        440,
-        300
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "6dSdIQ2xAFPzyEwe",
-          "name": "Postgres account"
+    ],
+    "connections": {
+        "8:30 AM Mon-Fri": {
+            "main": [
+                [
+                    {
+                        "node": "Read All Staging Data",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Get Users & Holdings",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Get Active Alerts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read All Staging Data": {
+            "main": [
+                [
+                    {
+                        "node": "Assemble Per-User Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Users & Holdings": {
+            "main": [
+                [
+                    {
+                        "node": "Assemble Per-User Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Active Alerts": {
+            "main": [
+                [
+                    {
+                        "node": "Assemble Per-User Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Assemble Per-User Context": {
+            "main": [
+                [
+                    {
+                        "node": "Claude: Generate Briefing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Claude: Generate Briefing": {
+            "main": [
+                [
+                    {
+                        "node": "Format Briefing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Briefing": {
+            "main": [
+                [
+                    {
+                        "node": "Send Briefing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
-      }
     },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id, u.settings, json_agg(json_build_object('symbol', h.symbol, 'qty', h.net_quantity, 'avg_price', h.avg_buy_price, 'invested', h.total_invested)) AS holdings FROM users u LEFT JOIN holdings h ON u.id = h.user_id AND h.net_quantity > 0 WHERE u.is_active = true GROUP BY u.id"
-      },
-      "id": "get-users-holdings",
-      "name": "Get Users & Holdings",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        440,
-        500
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "6dSdIQ2xAFPzyEwe",
-          "name": "Postgres account"
+    "settings": {
+        "executionOrder": "v0",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": {
+        "node:8:30 AM Mon-Fri": {
+            "recurrenceRules": []
         }
-      }
     },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT user_id, symbol, lower_bound, upper_bound, status FROM alerts WHERE status = 'active'"
-      },
-      "id": "get-active-alerts",
-      "name": "Get Active Alerts",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [
-        440,
-        700
-      ],
-      "credentials": {
-        "postgres": {
-          "id": "6dSdIQ2xAFPzyEwe",
-          "name": "Postgres account"
+    "meta": null,
+    "pinData": null,
+    "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+    "activeVersionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+    "versionCounter": 22,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-02-17T17:48:41.845Z",
+            "createdAt": "2026-02-17T17:48:41.845Z",
+            "role": "workflow:owner",
+            "workflowId": "NYoURGSYiDNdpP3Q",
+            "projectId": "qJqZAaC2LCOkdDc2",
+            "project": {
+                "updatedAt": "2026-02-17T17:30:11.422Z",
+                "createdAt": "2026-02-17T17:24:57.957Z",
+                "id": "qJqZAaC2LCOkdDc2",
+                "name": "Vipindas S <mail2vdas@gmail.com>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            }
         }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Assemble comprehensive context per user for Claude briefing\nconst stagingData = $('Read All Staging Data').all().map(i => i.json);\nconst users = $('Get Users & Holdings').all().map(i => i.json);\nconst allAlerts = $('Get Active Alerts').all().map(i => i.json);\n\n// Organize staging data by type\nconst staged = {};\nfor (const row of stagingData) {\n  const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;\n  if (row.symbol) {\n    if (!staged[row.data_type]) staged[row.data_type] = {};\n    staged[row.data_type][row.symbol] = data;\n  } else {\n    staged[row.data_type] = data;\n  }\n}\n\n// Generate personalized briefing request per user\nconst briefingRequests = [];\n\nfor (const user of users) {\n  const userAlerts = allAlerts.filter(a => a.user_id === user.user_id);\n  const holdings = user.holdings || [];\n  \n  // Build per-stock technical data\n  const stockAnalysis = [];\n  for (const h of holdings) {\n    if (!h.symbol) continue;\n    const tech = staged.technicals?.[h.symbol] || null;\n    const sentiment = (staged.options_news?.news_sentiment || [])\n      .find(s => s.symbol === h.symbol);\n    const alert = userAlerts.find(a => a.symbol === h.symbol);\n    \n    stockAnalysis.push({\n      symbol: h.symbol,\n      quantity: h.qty,\n      avg_buy_price: h.avg_price,\n      invested: h.invested,\n      technicals: tech,\n      sentiment: sentiment || null,\n      alert: alert || null\n    });\n  }\n\n  const context = {\n    user_name: user.display_name,\n    global_cues: staged.global_cues || {},\n    fii_dii: staged.fii_dii || {},\n    nifty_options: staged.options_news?.nifty_options || {},\n    corporate_actions: staged.options_news?.corporate_actions || {},\n    news_headlines: staged.options_news?.news_articles || [],\n    stock_analysis: stockAnalysis,\n    active_alerts_count: userAlerts.length\n  };\n\n  briefingRequests.push({\n    user_id: user.user_id,\n    chat_id: user.alerts_chat_id || user.private_chat_id,\n    display_name: user.display_name,\n    context: context\n  });\n}\n\nreturn briefingRequests.map(r => ({ json: r }));"
-      },
-      "id": "assemble-context",
-      "name": "Assemble Per-User Context",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        720,
-        500
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-02-18T13:55:43.398Z",
+        "createdAt": "2026-02-18T13:55:43.398Z",
+        "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+        "workflowId": "NYoURGSYiDNdpP3Q",
+        "nodes": [
             {
-              "name": "anthropic-version",
-              "value": "2023-06-01"
+                "parameters": {
+                    "rule": {
+                        "interval": [
+                            {
+                                "field": "cronExpression",
+                                "expression": "30 8 * * 1-5"
+                            }
+                        ]
+                    }
+                },
+                "id": "cron-830am",
+                "name": "8:30 AM Mon-Fri",
+                "type": "n8n-nodes-base.scheduleTrigger",
+                "typeVersion": 1.2,
+                "position": [
+                    220,
+                    300
+                ]
             },
             {
-              "name": "content-type",
-              "value": "application/json"
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT data_type, symbol, data FROM staging_data WHERE data_date = CURRENT_DATE ORDER BY data_type"
+                },
+                "id": "read-all-staging",
+                "name": "Read All Staging Data",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    440,
+                    300
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id, u.settings, json_agg(json_build_object('symbol', h.symbol, 'qty', h.net_quantity, 'avg_price', h.avg_buy_price, 'invested', h.total_invested)) AS holdings FROM users u LEFT JOIN holdings h ON u.id = h.user_id AND h.net_quantity > 0 WHERE u.is_active = true GROUP BY u.id"
+                },
+                "id": "get-users-holdings",
+                "name": "Get Users & Holdings",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    440,
+                    500
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT user_id, symbol, lower_bound, upper_bound, status FROM alerts WHERE status = 'active'"
+                },
+                "id": "get-active-alerts",
+                "name": "Get Active Alerts",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    440,
+                    700
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Assemble comprehensive context per user for Claude briefing\nconst stagingData = $('Read All Staging Data').all().map(i => i.json);\nconst users = $('Get Users & Holdings').all().map(i => i.json);\nconst allAlerts = $('Get Active Alerts').all().map(i => i.json);\n\n// Organize staging data by type\nconst staged = {};\nfor (const row of stagingData) {\n  const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;\n  if (row.symbol) {\n    if (!staged[row.data_type]) staged[row.data_type] = {};\n    staged[row.data_type][row.symbol] = data;\n  } else {\n    staged[row.data_type] = data;\n  }\n}\n\n// Generate personalized briefing request per user\nconst briefingRequests = [];\n\nfor (const user of users) {\n  const userAlerts = allAlerts.filter(a => a.user_id === user.user_id);\n  const holdings = user.holdings || [];\n  \n  // Build per-stock technical data\n  const stockAnalysis = [];\n  for (const h of holdings) {\n    if (!h.symbol) continue;\n    const tech = staged.technicals?.[h.symbol] || null;\n    const sentiment = (staged.options_news?.news_sentiment || [])\n      .find(s => s.symbol === h.symbol);\n    const alert = userAlerts.find(a => a.symbol === h.symbol);\n    \n    stockAnalysis.push({\n      symbol: h.symbol,\n      quantity: h.qty,\n      avg_buy_price: h.avg_price,\n      invested: h.invested,\n      technicals: tech,\n      sentiment: sentiment || null,\n      alert: alert || null\n    });\n  }\n\n  const context = {\n    user_name: user.display_name,\n    global_cues: staged.global_cues || {},\n    fii_dii: staged.fii_dii || {},\n    nifty_options: staged.options_news?.nifty_options || {},\n    corporate_actions: staged.options_news?.corporate_actions || {},\n    news_headlines: staged.options_news?.news_articles || [],\n    stock_analysis: stockAnalysis,\n    active_alerts_count: userAlerts.length\n  };\n\n  briefingRequests.push({\n    user_id: user.user_id,\n    chat_id: user.alerts_chat_id || user.private_chat_id,\n    display_name: user.display_name,\n    context: context\n  });\n}\n\nreturn briefingRequests.map(r => ({ json: r }));"
+                },
+                "id": "assemble-context",
+                "name": "Assemble Per-User Context",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    720,
+                    500
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.anthropic.com/v1/messages",
+                    "authentication": "genericCredentialType",
+                    "genericAuthType": "httpHeaderAuth",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "anthropic-version",
+                                "value": "2023-06-01"
+                            },
+                            {
+                                "name": "content-type",
+                                "value": "application/json"
+                            }
+                        ]
+                    },
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized morning briefing in Telegram markdown format (use * for bold). Keep it 400-500 words max.\\n\\nStructure:\\n1. \ud83c\udf0d MARKET PULSE (3 lines): Global overnight summary + FII/DII signal + NIFTY PCR & expected range\\n2. \ud83d\udcca STOCK-BY-STOCK (for each holding):\\n   - Technical (1 line): trend + key indicator\\n   - Flow (1 line): FII/DII context\\n   - News (1 line): sentiment + headline if notable\\n   - Options (1 line): if F&O stock \u2014 OI buildup\\n   - Alert distance: X% from upper/lower\\n   - Action: specific trigger for today\\n3. \ud83c\udfaf TODAY\\'S SCENARIOS: Bullish / Bearish / Most Likely cases (2-3 lines each)\\n4. \u26a1 TOP 2 ACTIONS: Specific actionable triggers with price levels\\n5. \u26a0\ufe0f RISK FLAGS: Overbought/oversold, unusual patterns, upcoming events\\n\\nEnd with: \u26a0\ufe0f Technical + flow analysis only. Not financial advice.\\n\\nBe specific with numbers. Use \u20b9 for prices. Use \ud83d\udfe2\ud83d\udd34\u26a1\u26a0\ufe0f emojis sparingly.', messages: [{ role: 'user', content: 'Generate morning briefing for ' + $json.display_name + ':\\n\\n' + JSON.stringify($json.context, null, 2) }] }) }}"
+                },
+                "id": "claude-briefing",
+                "name": "Claude: Generate Briefing",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1000,
+                    500
+                ],
+                "credentials": {
+                    "httpHeaderAuth": {
+                        "id": "Idkjo6pmv2QE4urQ",
+                        "name": "Anthropic Header Auth"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Extract briefing text from Claude response\nconst response = $input.first().json;\nconst briefing = response.content\n  .filter(c => c.type === 'text')\n  .map(c => c.text)\n  .join('');\n\n// Telegram max message is 4096 chars \u2014 split if needed\nconst chatId = $('Assemble Per-User Context').item.json.chat_id;\nconst messages = [];\n\nif (briefing.length <= 4096) {\n  messages.push({ chat_id: chatId, text: briefing });\n} else {\n  // Split at paragraph boundaries\n  const parts = briefing.match(/[\\s\\S]{1,4000}(?=\\n|$)/g) || [briefing];\n  for (const part of parts) {\n    messages.push({ chat_id: chatId, text: part.trim() });\n  }\n}\n\nreturn messages.map(m => ({ json: m }));"
+                },
+                "id": "format-briefing",
+                "name": "Format Briefing",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1220,
+                    500
+                ]
+            },
+            {
+                "parameters": {
+                    "chatId": "={{ $json.chat_id }}",
+                    "text": "={{ $json.text }}",
+                    "additionalFields": {
+                        "parse_mode": "Markdown",
+                        "appendAttribution": false
+                    }
+                },
+                "id": "send-briefing",
+                "name": "Send Briefing",
+                "type": "n8n-nodes-base.telegram",
+                "typeVersion": 1.2,
+                "position": [
+                    1440,
+                    500
+                ],
+                "credentials": {
+                    "telegramApi": {
+                        "id": "oh2jj2bRbyNVQvgB",
+                        "name": "Telegram account"
+                    }
+                }
             }
-          ]
+        ],
+        "connections": {
+            "8:30 AM Mon-Fri": {
+                "main": [
+                    [
+                        {
+                            "node": "Read All Staging Data",
+                            "type": "main",
+                            "index": 0
+                        },
+                        {
+                            "node": "Get Users & Holdings",
+                            "type": "main",
+                            "index": 0
+                        },
+                        {
+                            "node": "Get Active Alerts",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Read All Staging Data": {
+                "main": [
+                    [
+                        {
+                            "node": "Assemble Per-User Context",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Get Users & Holdings": {
+                "main": [
+                    [
+                        {
+                            "node": "Assemble Per-User Context",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Get Active Alerts": {
+                "main": [
+                    [
+                        {
+                            "node": "Assemble Per-User Context",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Assemble Per-User Context": {
+                "main": [
+                    [
+                        {
+                            "node": "Claude: Generate Briefing",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Claude: Generate Briefing": {
+                "main": [
+                    [
+                        {
+                            "node": "Format Briefing",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Format Briefing": {
+                "main": [
+                    [
+                        {
+                            "node": "Send Briefing",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1500, system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized morning briefing in Telegram markdown format (use * for bold). Keep it 400-500 words max.\\n\\nStructure:\\n1. \ud83c\udf0d MARKET PULSE (3 lines): Global overnight summary + FII/DII signal + NIFTY PCR & expected range\\n2. \ud83d\udcca STOCK-BY-STOCK (for each holding):\\n   - Technical (1 line): trend + key indicator\\n   - Flow (1 line): FII/DII context\\n   - News (1 line): sentiment + headline if notable\\n   - Options (1 line): if F&O stock \u2014 OI buildup\\n   - Alert distance: X% from upper/lower\\n   - Action: specific trigger for today\\n3. \ud83c\udfaf TODAY\\'S SCENARIOS: Bullish / Bearish / Most Likely cases (2-3 lines each)\\n4. \u26a1 TOP 2 ACTIONS: Specific actionable triggers with price levels\\n5. \u26a0\ufe0f RISK FLAGS: Overbought/oversold, unusual patterns, upcoming events\\n\\nEnd with: \u26a0\ufe0f Technical + flow analysis only. Not financial advice.\\n\\nBe specific with numbers. Use \u20b9 for prices. Use \ud83d\udfe2\ud83d\udd34\u26a1\u26a0\ufe0f emojis sparingly.', messages: [{ role: 'user', content: 'Generate morning briefing for ' + $json.display_name + ':\\n\\n' + JSON.stringify($json.context, null, 2) }] }) }}"
-      },
-      "id": "claude-briefing",
-      "name": "Claude: Generate Briefing",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1000,
-        500
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "Idkjo6pmv2QE4urQ",
-          "name": "Anthropic Header Auth"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Extract briefing text from Claude response\nconst response = $input.first().json;\nconst briefing = response.content\n  .filter(c => c.type === 'text')\n  .map(c => c.text)\n  .join('');\n\n// Telegram max message is 4096 chars \u2014 split if needed\nconst chatId = $('Assemble Per-User Context').item.json.chat_id;\nconst messages = [];\n\nif (briefing.length <= 4096) {\n  messages.push({ chat_id: chatId, text: briefing });\n} else {\n  // Split at paragraph boundaries\n  const parts = briefing.match(/[\\s\\S]{1,4000}(?=\\n|$)/g) || [briefing];\n  for (const part of parts) {\n    messages.push({ chat_id: chatId, text: part.trim() });\n  }\n}\n\nreturn messages.map(m => ({ json: m }));"
-      },
-      "id": "format-briefing",
-      "name": "Format Briefing",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1220,
-        500
-      ]
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $json.chat_id }}",
-        "text": "={{ $json.text }}",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "appendAttribution": false
-        }
-      },
-      "id": "send-briefing",
-      "name": "Send Briefing",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [
-        1440,
-        500
-      ],
-      "credentials": {
-        "telegramApi": {
-          "id": "oh2jj2bRbyNVQvgB",
-          "name": "Telegram account"
-        }
-      }
+        "authors": "Vipindas S",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-02-19T03:35:12.956Z",
+                "id": 166,
+                "workflowId": "NYoURGSYiDNdpP3Q",
+                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "event": "deactivated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T03:35:13.027Z",
+                "id": 167,
+                "workflowId": "NYoURGSYiDNdpP3Q",
+                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "event": "activated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T03:35:14.524Z",
+                "id": 168,
+                "workflowId": "NYoURGSYiDNdpP3Q",
+                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "event": "deactivated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T03:35:14.590Z",
+                "id": 169,
+                "workflowId": "NYoURGSYiDNdpP3Q",
+                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "event": "activated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            }
+        ]
     }
-  ],
-  "connections": {
-    "8:30 AM Mon-Fri": {
-      "main": [
-        [
-          {
-            "node": "Read All Staging Data",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Get Users & Holdings",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Get Active Alerts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read All Staging Data": {
-      "main": [
-        [
-          {
-            "node": "Assemble Per-User Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Users & Holdings": {
-      "main": [
-        [
-          {
-            "node": "Assemble Per-User Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Active Alerts": {
-      "main": [
-        [
-          {
-            "node": "Assemble Per-User Context",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Assemble Per-User Context": {
-      "main": [
-        [
-          {
-            "node": "Claude: Generate Briefing",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Claude: Generate Briefing": {
-      "main": [
-        [
-          {
-            "node": "Format Briefing",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Briefing": {
-      "main": [
-        [
-          {
-            "node": "Send Briefing",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "tags": [
-    {
-      "name": "StockPulse"
-    },
-    {
-      "name": "Morning Pipeline"
-    }
-  ],
-  "triggerCount": 1,
-  "active": false
 }
