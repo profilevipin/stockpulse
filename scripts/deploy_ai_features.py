@@ -589,7 +589,9 @@ conns["Claude: Ask"] = {"main": [[{"node": "Format Ask Response", "type": "main"
 conns["Format Ask Response"] = {"main": [[{"node": "Send Ask Response", "type": "main", "index": 0}]]}
 
 # Add output 11 for ask in Route by Intent (index 11 = new rule we added)
-route_main.append([{"node": "Fetch Ask Context", "type": "main", "index": 0}])
+# The "else/fallback" (Handle Unknown) is currently at the last index.
+# Insert ask BEFORE it so: ask=output 11, Handle Unknown=output 12 (else)
+route_main.insert(-1, [{"node": "Fetch Ask Context", "type": "main", "index": 0}])
 
 print("  ✓ Fetch Ask Context node added")
 print("  ✓ Claude: Ask node added")
