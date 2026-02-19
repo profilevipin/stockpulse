@@ -24,6 +24,26 @@
     {
       "parameters": {
         "operation": "executeQuery",
+        "query": "SELECT ks.access_token_encrypted FROM kite_sessions ks JOIN users u ON ks.user_id = u.id WHERE u.is_kite_provider = true AND ks.token_expiry > NOW() LIMIT 1"
+      },
+      "id": "fetch-kite-token",
+      "name": "Fetch Kite Token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        330,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
         "query": "SELECT DISTINCT symbol FROM holdings WHERE net_quantity > 0 UNION SELECT DISTINCT symbol FROM alerts WHERE status = 'active'"
       },
       "id": "get-all-symbols",
@@ -31,7 +51,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        440,
+        540,
         300
       ],
       "credentials": {
@@ -50,7 +70,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
+        760,
         300
       ]
     },
@@ -64,7 +84,7 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        880,
+        980,
         300
       ]
     },
@@ -72,16 +92,26 @@
       "parameters": {
         "method": "GET",
         "url": "={{ $json.url }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'token gifzm9kfars6kr8x:' + $('Fetch Kite Token').first().json.access_token_encrypted }}"
+            },
             {
               "name": "X-Kite-Version",
               "value": "3"
             }
           ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false
+            }
+          }
         }
       },
       "id": "kite-historical",
@@ -89,15 +119,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1200,
         300
       ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "du74DqpJeNl4luFf",
-          "name": "Header Auth account"
-        }
-      }
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -108,7 +133,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
+        1420,
         300
       ]
     },
@@ -125,7 +150,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1540,
+        1640,
         300
       ],
       "credentials": {
@@ -138,6 +163,17 @@
   ],
   "connections": {
     "8:00 AM Mon-Fri": {
+      "main": [
+        [
+          {
+            "node": "Fetch Kite Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Kite Token": {
       "main": [
         [
           {
@@ -216,16 +252,13 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
   },
-  "tags": [
-    {
-      "name": "StockPulse"
-    },
-    {
-      "name": "Morning Pipeline"
+  "staticData": {
+    "node:8:00 AM Mon-Fri": {
+      "recurrenceRules": []
     }
-  ],
-  "triggerCount": 1,
-  "active": false
+  }
 }
