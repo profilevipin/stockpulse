@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1-5" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1-5"
+            }
+          ]
         }
       },
       "id": "cron-7am",
       "name": "7:00 AM Mon-Fri",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -21,7 +29,10 @@
       "name": "Holiday Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -33,7 +44,11 @@
       "name": "NSE Service: Global Indices",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 200]
+      "position": [
+        660,
+        200
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -44,8 +59,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -56,10 +77,17 @@
       "name": "Claude: Global Market Search",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 400],
+      "position": [
+        660,
+        400
+      ],
       "credentials": {
-        "httpHeaderAuth": { "id": "CLAUDE_CREDENTIAL_ID", "name": "Claude API" }
-      }
+        "httpHeaderAuth": {
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -73,69 +101,144 @@
       "name": "Finnhub: Market News",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 600],
+      "position": [
+        660,
+        600
+      ],
       "credentials": {
-        "httpQueryAuth": { "id": "FINNHUB_CREDENTIAL_ID", "name": "Finnhub API" }
-      }
+        "httpQueryAuth": {
+          "id": "9Q9jzHs5MYZrTHmZ",
+          "name": "Finnhub Query Auth"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Combine all global data sources and store in staging_data\nconst globalIndices = $('NSE Service: Global Indices').first().json;\nconst claudeResponse = $('Claude: Global Market Search').first().json;\nconst finnhubNews = $('Finnhub: Market News').first().json;\n\n// Parse Claude's web search results\nlet globalCues = {};\ntry {\n  const text = claudeResponse.content\n    .filter(c => c.type === 'text')\n    .map(c => c.text)\n    .join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  globalCues = JSON.parse(clean);\n} catch (e) {\n  globalCues = { parse_error: e.message, raw: claudeResponse.content };\n}\n\n// Filter relevant Finnhub news (last 12 hours)\nconst twelveHoursAgo = Math.floor(Date.now() / 1000) - 12 * 3600;\nconst recentNews = Array.isArray(finnhubNews)\n  ? finnhubNews.filter(n => n.datetime > twelveHoursAgo).slice(0, 10)\n  : [];\n\nconst combinedData = {\n  global_indices: globalIndices,\n  global_cues: globalCues,\n  overnight_news: recentNews.map(n => ({\n    headline: n.headline,\n    source: n.source,\n    url: n.url,\n    summary: n.summary\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: $('Holiday Check').first().json.date } }];"
+        "jsCode": "// Combine all global data sources with error handling\nlet globalIndices = {};\nlet claudeResponse = {};\nlet finnhubNews = [];\n\ntry { globalIndices = $('NSE Service: Global Indices').first().json; } catch (e) { globalIndices = { error: 'NSE service unavailable', details: e.message }; }\ntry { claudeResponse = $('Claude: Global Market Search').first().json; } catch (e) { claudeResponse = { content: [{ type: 'text', text: '{}' }], error: e.message }; }\ntry { finnhubNews = $('Finnhub: Market News').first().json; } catch (e) { finnhubNews = []; }\n\n// Parse Claude's web search results\nlet globalCues = {};\ntry {\n  const content = claudeResponse.content || [];\n  const text = content.filter(c => c.type === 'text').map(c => c.text).join('');\n  const clean = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  globalCues = JSON.parse(clean);\n} catch (e) {\n  globalCues = { parse_error: e.message, raw: claudeResponse.content };\n}\n\n// Filter relevant Finnhub news (last 12 hours)\nconst twelveHoursAgo = Math.floor(Date.now() / 1000) - 12 * 3600;\nconst newsArray = Array.isArray(finnhubNews) ? finnhubNews : [];\nconst recentNews = newsArray.filter(n => n.datetime > twelveHoursAgo).slice(0, 10);\n\nconst combinedData = {\n  global_indices: globalIndices,\n  global_cues: globalCues,\n  overnight_news: recentNews.map(n => ({\n    headline: n.headline,\n    source: n.source,\n    url: n.url,\n    summary: n.summary\n  })),\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: $('Holiday Check').first().json.date } }];"
       },
       "id": "combine-global-data",
       "name": "Combine Global Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [940, 400]
+      "position": [
+        940,
+        400
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'global_cues', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.date, JSON.stringify($json.data)] }}"
-          }
+          "queryReplacement": "={{ [$json.date, JSON.stringify($json.data)] }}"
         }
       },
       "id": "store-staging",
       "name": "Store in Staging",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1160, 400],
+      "position": [
+        1160,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     }
   ],
   "connections": {
     "7:00 AM Mon-Fri": {
-      "main": [[{ "node": "Holiday Check", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Holiday Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Holiday Check": {
       "main": [
         [
-          { "node": "NSE Service: Global Indices", "type": "main", "index": 0 },
-          { "node": "Claude: Global Market Search", "type": "main", "index": 0 },
-          { "node": "Finnhub: Market News", "type": "main", "index": 0 }
+          {
+            "node": "NSE Service: Global Indices",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude: Global Market Search",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Finnhub: Market News",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "NSE Service: Global Indices": {
-      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Global Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Claude: Global Market Search": {
-      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Global Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Finnhub: Market News": {
-      "main": [[{ "node": "Combine Global Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Global Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Combine Global Data": {
-      "main": [[{ "node": "Store in Staging", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Store in Staging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    },
+    {
+      "name": "Morning Pipeline"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }

@@ -1,0 +1,795 @@
+{
+    "updatedAt": "2026-02-19T04:43:49.342Z",
+    "createdAt": "2026-02-17T17:48:40.825Z",
+    "id": "HrZhfXdfFQltaexx",
+    "name": "WF2 - Price Alert Checker",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "seconds",
+                            "secondsInterval": 30
+                        }
+                    ]
+                }
+            },
+            "id": "schedule-trigger",
+            "name": "Every 30 Seconds",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Check if Indian stock market is currently open\nconst now = new Date();\n// Convert to IST (UTC+5:30)\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\n\nconst day = ist.getDay(); // 0=Sun, 6=Sat\nif (day === 0 || day === 6) {\n  return []; // Weekend \u2014 stop execution\n}\n\nconst hours = ist.getHours();\nconst minutes = ist.getMinutes();\nconst timeMinutes = hours * 60 + minutes;\n\n// Market hours: 9:15 AM to 3:30 PM IST\nconst MARKET_OPEN = 9 * 60 + 15;  // 555\nconst MARKET_CLOSE = 15 * 60 + 30; // 930\n\nif (timeMinutes < MARKET_OPEN || timeMinutes > MARKET_CLOSE) {\n  return []; // Outside market hours \u2014 stop\n}\n\n// Check for holidays\nconst dateStr = ist.toISOString().split('T')[0];\n\nreturn [{ json: { market_open: true, ist_time: ist.toISOString(), date: dateStr } }];"
+            },
+            "id": "check-market-hours",
+            "name": "Check Market Hours",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT a.id, a.user_id, a.symbol, a.exchange, a.lower_bound, a.upper_bound, a.status, a.cooldown_until, a.trigger_count, u.settings, u.alerts_chat_id, u.private_chat_id, u.display_name FROM alerts a JOIN users u ON a.user_id = u.id WHERE a.status = 'active' AND u.is_active = true AND (a.cooldown_until IS NULL OR a.cooldown_until < NOW())"
+            },
+            "id": "fetch-active-alerts",
+            "name": "Fetch Active Alerts",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                660,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "loose"
+                    },
+                    "conditions": [
+                        {
+                            "id": "has-alerts",
+                            "leftValue": "={{ $input.all().length }}",
+                            "rightValue": "0",
+                            "operator": {
+                                "type": "number",
+                                "operation": "gt"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "has-alerts",
+            "name": "Any Active Alerts?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                880,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Build batch Kite API quote request for all unique symbols\nconst alerts = $input.all().map(i => i.json);\nconst uniqueSymbols = [...new Set(alerts.map(a => `${a.exchange}:${a.symbol}`))];\nconst queryParams = uniqueSymbols.map(s => `i=${s}`).join('&');\n\nreturn [{\n  json: {\n    alerts: alerts,\n    quote_url: `https://api.kite.trade/quote?${queryParams}`,\n    symbol_count: uniqueSymbols.length\n  }\n}];"
+            },
+            "id": "build-quote-request",
+            "name": "Build Quote Request",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1100,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "={{ $json.quote_url }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "X-Kite-Version",
+                            "value": "3"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "={{ 'token gifzm9kfars6kr8x:' + $('Fetch Kite Token').first().json.access_token_encrypted }}"
+                        }
+                    ]
+                }
+            },
+            "id": "kite-batch-quote",
+            "name": "Kite: Batch Quote",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1320,
+                200
+            ],
+            "onError": "continueRegularOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Check if Kite API returned an error\nconst kiteResp = $input.first().json;\nif (kiteResp.error_type || kiteResp.status === 'error' || !kiteResp.data) {\n  // Kite token expired or API error - skip this cycle silently\n  return [];\n}\n\n// Compare live prices against all alert bounds\nconst quotes = $input.first().json.data || {};\nconst alerts = $('Build Quote Request').item.json.alerts;\nconst now = new Date();\n\nconst triggered = [];\nconst approaching = [];\n\nfor (const alert of alerts) {\n  const key = `${alert.exchange}:${alert.symbol}`;\n  const quote = quotes[key];\n  if (!quote || !quote.last_price) continue;\n\n  const price = quote.last_price;\n  const dayChange = quote.net_change || 0;\n  const volume = quote.volume || 0;\n  \n  let triggerType = null;\n  let severity = 'info';\n  let message = '';\n\n  // Hard triggers\n  if (alert.upper_bound && price >= parseFloat(alert.upper_bound)) {\n    triggerType = 'HIT_UPPER';\n    severity = 'high';\n    message = `\ud83d\udcc8 *${alert.symbol}* hit \u20b9${price}!\\n` +\n              `Above your upper bound of \u20b9${alert.upper_bound}\\n` +\n              `Day change: ${dayChange >= 0 ? '+' : ''}${dayChange.toFixed(2)}`;\n  } else if (alert.lower_bound && price <= parseFloat(alert.lower_bound)) {\n    triggerType = 'HIT_LOWER';\n    severity = 'high';\n    message = `\ud83d\udcc9 *${alert.symbol}* dropped to \u20b9${price}!\\n` +\n              `Below your lower bound of \u20b9${alert.lower_bound}\\n` +\n              `Day change: ${dayChange >= 0 ? '+' : ''}${dayChange.toFixed(2)}`;\n  }\n\n  // Proximity alerts (within 1.5%)\n  if (!triggerType) {\n    const proximityPct = 1.5;\n    if (alert.upper_bound) {\n      const distPct = ((parseFloat(alert.upper_bound) - price) / price) * 100;\n      if (distPct > 0 && distPct <= proximityPct) {\n        triggerType = 'APPROACHING_UPPER';\n        severity = 'medium';\n        message = `\u26a1 *${alert.symbol}* at \u20b9${price}\\n` +\n                  `Only ${distPct.toFixed(1)}% from your \u20b9${alert.upper_bound} target`;\n      }\n    }\n    if (!triggerType && alert.lower_bound) {\n      const distPct = ((price - parseFloat(alert.lower_bound)) / price) * 100;\n      if (distPct > 0 && distPct <= proximityPct) {\n        triggerType = 'APPROACHING_LOWER';\n        severity = 'medium';\n        message = `\u26a0\ufe0f *${alert.symbol}* at \u20b9${price}\\n` +\n                  `Only ${distPct.toFixed(1)}% from your \u20b9${alert.lower_bound} floor`;\n      }\n    }\n  }\n\n  if (triggerType) {\n    const cooldownMinutes = 30;\n    const cooldownUntil = new Date(now.getTime() + cooldownMinutes * 60 * 1000);\n    \n    const result = {\n      alert_id: alert.id,\n      user_id: alert.user_id,\n      symbol: alert.symbol,\n      current_price: price,\n      trigger_type: triggerType,\n      severity: severity,\n      message: message,\n      chat_id: alert.alerts_chat_id || alert.private_chat_id,\n      display_name: alert.display_name,\n      upper_bound: alert.upper_bound,\n      lower_bound: alert.lower_bound,\n      cooldown_until: cooldownUntil.toISOString(),\n      new_status: severity === 'high' \n        ? (triggerType.includes('UPPER') ? 'triggered_upper' : 'triggered_lower')\n        : 'active'\n    };\n\n    if (severity === 'high') triggered.push(result);\n    else approaching.push(result);\n  }\n}\n\n// Return all alerts that need notification\nconst allAlerts = [...triggered, ...approaching];\nreturn allAlerts.map(a => ({ json: a }));"
+            },
+            "id": "compare-prices",
+            "name": "Compare Prices to Alerts",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1540,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "loose"
+                    },
+                    "conditions": [
+                        {
+                            "id": "has-triggered",
+                            "leftValue": "={{ $input.all().length }}",
+                            "rightValue": "0",
+                            "operator": {
+                                "type": "number",
+                                "operation": "gt"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                }
+            },
+            "id": "any-triggered",
+            "name": "Any Triggered?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                1760,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "UPDATE alerts SET status = $1, cooldown_until = $2, triggered_at = NOW(), triggered_price = $3, trigger_count = trigger_count + 1, last_triggered_at = NOW() WHERE id = $4",
+                "options": {
+                    "queryReplacement": "={{ [$json.new_status, $json.cooldown_until, $json.current_price, $json.alert_id] }}"
+                }
+            },
+            "id": "update-alert-status",
+            "name": "Update Alert Status",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                1980,
+                100
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "chatId": "={{ $json.chat_id }}",
+                "text": "={{ $json.message }}",
+                "additionalFields": {
+                    "parse_mode": "Markdown",
+                    "reply_markup": "={{ JSON.stringify({ inline_keyboard: [ [ { text: '\ud83d\udcb0 Sell', callback_data: 'sell_' + $json.symbol + '_market' }, { text: '\ud83d\udcca Analysis', callback_data: 'predict_' + $json.symbol } ], [ { text: '\ud83d\udd14 Adjust Alert', callback_data: 'alert_prompt_' + $json.symbol }, { text: '\u274c Cancel Alert', callback_data: 'cancel_alert_' + $json.symbol } ] ] }) }}"
+                }
+            },
+            "id": "send-alert-notification",
+            "name": "Send Alert Notification",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1.2,
+            "position": [
+                2200,
+                100
+            ],
+            "credentials": {
+                "telegramApi": {
+                    "id": "oh2jj2bRbyNVQvgB",
+                    "name": "Telegram account"
+                }
+            }
+        },
+        {
+            "id": "fetch-kite-token-wf2",
+            "name": "Fetch Kite Token",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                1060,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            },
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT ks.access_token_encrypted FROM kite_sessions ks JOIN users u ON ks.user_id = u.id WHERE u.is_kite_provider = true AND ks.token_expiry > NOW() LIMIT 1",
+                "options": {}
+            }
+        }
+    ],
+    "connections": {
+        "Every 30 Seconds": {
+            "main": [
+                [
+                    {
+                        "node": "Check Market Hours",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Market Hours": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Active Alerts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Active Alerts": {
+            "main": [
+                [
+                    {
+                        "node": "Any Active Alerts?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Any Active Alerts?": {
+            "main": [
+                [
+                    {
+                        "node": "Build Quote Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Build Quote Request": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Kite Token",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Kite: Batch Quote": {
+            "main": [
+                [
+                    {
+                        "node": "Compare Prices to Alerts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Compare Prices to Alerts": {
+            "main": [
+                [
+                    {
+                        "node": "Any Triggered?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Any Triggered?": {
+            "main": [
+                [
+                    {
+                        "node": "Update Alert Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Update Alert Status": {
+            "main": [
+                [
+                    {
+                        "node": "Send Alert Notification",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Kite Token": {
+            "main": [
+                [
+                    {
+                        "node": "Kite: Batch Quote",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": {
+        "node:Every 30 Seconds": {
+            "recurrenceRules": []
+        }
+    },
+    "meta": null,
+    "pinData": {},
+    "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+    "activeVersionId": "a8c64718-9228-4769-a790-3dfd566985db",
+    "versionCounter": 30,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-02-17T17:48:40.825Z",
+            "createdAt": "2026-02-17T17:48:40.825Z",
+            "role": "workflow:owner",
+            "workflowId": "HrZhfXdfFQltaexx",
+            "projectId": "qJqZAaC2LCOkdDc2",
+            "project": {
+                "updatedAt": "2026-02-17T17:30:11.422Z",
+                "createdAt": "2026-02-17T17:24:57.957Z",
+                "id": "qJqZAaC2LCOkdDc2",
+                "name": "Vipindas S <mail2vdas@gmail.com>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-02-19T04:43:49.345Z",
+        "createdAt": "2026-02-19T04:43:49.345Z",
+        "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+        "workflowId": "HrZhfXdfFQltaexx",
+        "nodes": [
+            {
+                "parameters": {
+                    "rule": {
+                        "interval": [
+                            {
+                                "field": "seconds",
+                                "secondsInterval": 30
+                            }
+                        ]
+                    }
+                },
+                "id": "schedule-trigger",
+                "name": "Every 30 Seconds",
+                "type": "n8n-nodes-base.scheduleTrigger",
+                "typeVersion": 1.2,
+                "position": [
+                    220,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Check if Indian stock market is currently open\nconst now = new Date();\n// Convert to IST (UTC+5:30)\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\n\nconst day = ist.getDay(); // 0=Sun, 6=Sat\nif (day === 0 || day === 6) {\n  return []; // Weekend \u2014 stop execution\n}\n\nconst hours = ist.getHours();\nconst minutes = ist.getMinutes();\nconst timeMinutes = hours * 60 + minutes;\n\n// Market hours: 9:15 AM to 3:30 PM IST\nconst MARKET_OPEN = 9 * 60 + 15;  // 555\nconst MARKET_CLOSE = 15 * 60 + 30; // 930\n\nif (timeMinutes < MARKET_OPEN || timeMinutes > MARKET_CLOSE) {\n  return []; // Outside market hours \u2014 stop\n}\n\n// Check for holidays\nconst dateStr = ist.toISOString().split('T')[0];\n\nreturn [{ json: { market_open: true, ist_time: ist.toISOString(), date: dateStr } }];"
+                },
+                "id": "check-market-hours",
+                "name": "Check Market Hours",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    440,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT a.id, a.user_id, a.symbol, a.exchange, a.lower_bound, a.upper_bound, a.status, a.cooldown_until, a.trigger_count, u.settings, u.alerts_chat_id, u.private_chat_id, u.display_name FROM alerts a JOIN users u ON a.user_id = u.id WHERE a.status = 'active' AND u.is_active = true AND (a.cooldown_until IS NULL OR a.cooldown_until < NOW())"
+                },
+                "id": "fetch-active-alerts",
+                "name": "Fetch Active Alerts",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    660,
+                    300
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "loose"
+                        },
+                        "conditions": [
+                            {
+                                "id": "has-alerts",
+                                "leftValue": "={{ $input.all().length }}",
+                                "rightValue": "0",
+                                "operator": {
+                                    "type": "number",
+                                    "operation": "gt"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    }
+                },
+                "id": "has-alerts",
+                "name": "Any Active Alerts?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2,
+                "position": [
+                    880,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Build batch Kite API quote request for all unique symbols\nconst alerts = $input.all().map(i => i.json);\nconst uniqueSymbols = [...new Set(alerts.map(a => `${a.exchange}:${a.symbol}`))];\nconst queryParams = uniqueSymbols.map(s => `i=${s}`).join('&');\n\nreturn [{\n  json: {\n    alerts: alerts,\n    quote_url: `https://api.kite.trade/quote?${queryParams}`,\n    symbol_count: uniqueSymbols.length\n  }\n}];"
+                },
+                "id": "build-quote-request",
+                "name": "Build Quote Request",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1100,
+                    200
+                ]
+            },
+            {
+                "parameters": {
+                    "method": "GET",
+                    "url": "={{ $json.quote_url }}",
+                    "sendHeaders": true,
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "X-Kite-Version",
+                                "value": "3"
+                            },
+                            {
+                                "name": "Authorization",
+                                "value": "={{ 'token gifzm9kfars6kr8x:' + $('Fetch Kite Token').first().json.access_token_encrypted }}"
+                            }
+                        ]
+                    }
+                },
+                "id": "kite-batch-quote",
+                "name": "Kite: Batch Quote",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    1320,
+                    200
+                ],
+                "onError": "continueRegularOutput"
+            },
+            {
+                "parameters": {
+                    "jsCode": "// Check if Kite API returned an error\nconst kiteResp = $input.first().json;\nif (kiteResp.error_type || kiteResp.status === 'error' || !kiteResp.data) {\n  // Kite token expired or API error - skip this cycle silently\n  return [];\n}\n\n// Compare live prices against all alert bounds\nconst quotes = $input.first().json.data || {};\nconst alerts = $('Build Quote Request').item.json.alerts;\nconst now = new Date();\n\nconst triggered = [];\nconst approaching = [];\n\nfor (const alert of alerts) {\n  const key = `${alert.exchange}:${alert.symbol}`;\n  const quote = quotes[key];\n  if (!quote || !quote.last_price) continue;\n\n  const price = quote.last_price;\n  const dayChange = quote.net_change || 0;\n  const volume = quote.volume || 0;\n  \n  let triggerType = null;\n  let severity = 'info';\n  let message = '';\n\n  // Hard triggers\n  if (alert.upper_bound && price >= parseFloat(alert.upper_bound)) {\n    triggerType = 'HIT_UPPER';\n    severity = 'high';\n    message = `\ud83d\udcc8 *${alert.symbol}* hit \u20b9${price}!\\n` +\n              `Above your upper bound of \u20b9${alert.upper_bound}\\n` +\n              `Day change: ${dayChange >= 0 ? '+' : ''}${dayChange.toFixed(2)}`;\n  } else if (alert.lower_bound && price <= parseFloat(alert.lower_bound)) {\n    triggerType = 'HIT_LOWER';\n    severity = 'high';\n    message = `\ud83d\udcc9 *${alert.symbol}* dropped to \u20b9${price}!\\n` +\n              `Below your lower bound of \u20b9${alert.lower_bound}\\n` +\n              `Day change: ${dayChange >= 0 ? '+' : ''}${dayChange.toFixed(2)}`;\n  }\n\n  // Proximity alerts (within 1.5%)\n  if (!triggerType) {\n    const proximityPct = 1.5;\n    if (alert.upper_bound) {\n      const distPct = ((parseFloat(alert.upper_bound) - price) / price) * 100;\n      if (distPct > 0 && distPct <= proximityPct) {\n        triggerType = 'APPROACHING_UPPER';\n        severity = 'medium';\n        message = `\u26a1 *${alert.symbol}* at \u20b9${price}\\n` +\n                  `Only ${distPct.toFixed(1)}% from your \u20b9${alert.upper_bound} target`;\n      }\n    }\n    if (!triggerType && alert.lower_bound) {\n      const distPct = ((price - parseFloat(alert.lower_bound)) / price) * 100;\n      if (distPct > 0 && distPct <= proximityPct) {\n        triggerType = 'APPROACHING_LOWER';\n        severity = 'medium';\n        message = `\u26a0\ufe0f *${alert.symbol}* at \u20b9${price}\\n` +\n                  `Only ${distPct.toFixed(1)}% from your \u20b9${alert.lower_bound} floor`;\n      }\n    }\n  }\n\n  if (triggerType) {\n    const cooldownMinutes = 30;\n    const cooldownUntil = new Date(now.getTime() + cooldownMinutes * 60 * 1000);\n    \n    const result = {\n      alert_id: alert.id,\n      user_id: alert.user_id,\n      symbol: alert.symbol,\n      current_price: price,\n      trigger_type: triggerType,\n      severity: severity,\n      message: message,\n      chat_id: alert.alerts_chat_id || alert.private_chat_id,\n      display_name: alert.display_name,\n      upper_bound: alert.upper_bound,\n      lower_bound: alert.lower_bound,\n      cooldown_until: cooldownUntil.toISOString(),\n      new_status: severity === 'high' \n        ? (triggerType.includes('UPPER') ? 'triggered_upper' : 'triggered_lower')\n        : 'active'\n    };\n\n    if (severity === 'high') triggered.push(result);\n    else approaching.push(result);\n  }\n}\n\n// Return all alerts that need notification\nconst allAlerts = [...triggered, ...approaching];\nreturn allAlerts.map(a => ({ json: a }));"
+                },
+                "id": "compare-prices",
+                "name": "Compare Prices to Alerts",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    1540,
+                    200
+                ]
+            },
+            {
+                "parameters": {
+                    "conditions": {
+                        "options": {
+                            "caseSensitive": true,
+                            "leftValue": "",
+                            "typeValidation": "loose"
+                        },
+                        "conditions": [
+                            {
+                                "id": "has-triggered",
+                                "leftValue": "={{ $input.all().length }}",
+                                "rightValue": "0",
+                                "operator": {
+                                    "type": "number",
+                                    "operation": "gt"
+                                }
+                            }
+                        ],
+                        "combinator": "and"
+                    }
+                },
+                "id": "any-triggered",
+                "name": "Any Triggered?",
+                "type": "n8n-nodes-base.if",
+                "typeVersion": 2,
+                "position": [
+                    1760,
+                    200
+                ]
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "UPDATE alerts SET status = $1, cooldown_until = $2, triggered_at = NOW(), triggered_price = $3, trigger_count = trigger_count + 1, last_triggered_at = NOW() WHERE id = $4",
+                    "options": {
+                        "queryReplacement": "={{ [$json.new_status, $json.cooldown_until, $json.current_price, $json.alert_id] }}"
+                    }
+                },
+                "id": "update-alert-status",
+                "name": "Update Alert Status",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    1980,
+                    100
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                }
+            },
+            {
+                "parameters": {
+                    "chatId": "={{ $json.chat_id }}",
+                    "text": "={{ $json.message }}",
+                    "additionalFields": {
+                        "parse_mode": "Markdown",
+                        "reply_markup": "={{ JSON.stringify({ inline_keyboard: [ [ { text: '\ud83d\udcb0 Sell', callback_data: 'sell_' + $json.symbol + '_market' }, { text: '\ud83d\udcca Analysis', callback_data: 'predict_' + $json.symbol } ], [ { text: '\ud83d\udd14 Adjust Alert', callback_data: 'alert_prompt_' + $json.symbol }, { text: '\u274c Cancel Alert', callback_data: 'cancel_alert_' + $json.symbol } ] ] }) }}"
+                    }
+                },
+                "id": "send-alert-notification",
+                "name": "Send Alert Notification",
+                "type": "n8n-nodes-base.telegram",
+                "typeVersion": 1.2,
+                "position": [
+                    2200,
+                    100
+                ],
+                "credentials": {
+                    "telegramApi": {
+                        "id": "oh2jj2bRbyNVQvgB",
+                        "name": "Telegram account"
+                    }
+                }
+            },
+            {
+                "id": "fetch-kite-token-wf2",
+                "name": "Fetch Kite Token",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    1060,
+                    300
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                },
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT ks.access_token_encrypted FROM kite_sessions ks JOIN users u ON ks.user_id = u.id WHERE u.is_kite_provider = true AND ks.token_expiry > NOW() LIMIT 1",
+                    "options": {}
+                }
+            }
+        ],
+        "connections": {
+            "Every 30 Seconds": {
+                "main": [
+                    [
+                        {
+                            "node": "Check Market Hours",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Check Market Hours": {
+                "main": [
+                    [
+                        {
+                            "node": "Fetch Active Alerts",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Fetch Active Alerts": {
+                "main": [
+                    [
+                        {
+                            "node": "Any Active Alerts?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Any Active Alerts?": {
+                "main": [
+                    [
+                        {
+                            "node": "Build Quote Request",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    []
+                ]
+            },
+            "Build Quote Request": {
+                "main": [
+                    [
+                        {
+                            "node": "Fetch Kite Token",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Kite: Batch Quote": {
+                "main": [
+                    [
+                        {
+                            "node": "Compare Prices to Alerts",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Compare Prices to Alerts": {
+                "main": [
+                    [
+                        {
+                            "node": "Any Triggered?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Any Triggered?": {
+                "main": [
+                    [
+                        {
+                            "node": "Update Alert Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    []
+                ]
+            },
+            "Update Alert Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Send Alert Notification",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Fetch Kite Token": {
+                "main": [
+                    [
+                        {
+                            "node": "Kite: Batch Quote",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "Vipindas S",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-02-19T04:43:49.527Z",
+                "id": 187,
+                "workflowId": "HrZhfXdfFQltaexx",
+                "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+                "event": "deactivated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T04:43:49.589Z",
+                "id": 188,
+                "workflowId": "HrZhfXdfFQltaexx",
+                "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+                "event": "activated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T04:43:51.661Z",
+                "id": 189,
+                "workflowId": "HrZhfXdfFQltaexx",
+                "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+                "event": "deactivated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            },
+            {
+                "createdAt": "2026-02-19T04:43:51.922Z",
+                "id": 190,
+                "workflowId": "HrZhfXdfFQltaexx",
+                "versionId": "a8c64718-9228-4769-a790-3dfd566985db",
+                "event": "activated",
+                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
+            }
+        ]
+    }
+}

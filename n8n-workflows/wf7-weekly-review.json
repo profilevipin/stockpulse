@@ -4,84 +4,110 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "0 10 * * 0" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 0"
+            }
+          ]
         }
       },
       "id": "cron-sunday-10am",
       "name": "Sunday 10:00 AM",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT u.id AS user_id, u.display_name, u.alerts_chat_id, u.private_chat_id FROM users u WHERE u.is_active = true"
       },
       "id": "get-users",
       "name": "Get Users",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT ds.snapshot_date, ds.portfolio_value, ds.total_pnl, ds.day_pnl, ds.holdings_detail FROM daily_snapshots ds WHERE ds.user_id = $1 AND ds.snapshot_date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY ds.snapshot_date",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id] }}"
         }
       },
       "id": "get-week-snapshots",
       "name": "Get Week Snapshots",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [660, 300],
+      "position": [
+        660,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT symbol, trade_type, quantity, price, trade_date FROM trades WHERE user_id = $1 AND trade_date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY trade_date",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ $('Get Users').item.json.user_id }}"
-          }
+          "queryReplacement": "={{ $('Get Users').item.json.user_id }}"
         }
       },
       "id": "get-week-trades",
       "name": "Get Week Trades",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [660, 500],
+      "position": [
+        660,
+        500
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT symbol, direction, predicted_probability, status, actual_hit, accuracy_score FROM predictions WHERE user_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '7 days'",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ $('Get Users').item.json.user_id }}"
-          }
+          "queryReplacement": "={{ $('Get Users').item.json.user_id }}"
         }
       },
       "id": "get-week-predictions",
       "name": "Get Week Predictions",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [660, 700],
+      "position": [
+        660,
+        700
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
@@ -92,7 +118,10 @@
       "name": "Assemble Weekly Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [940, 500]
+      "position": [
+        940,
+        500
+      ]
     },
     {
       "parameters": {
@@ -103,70 +132,157 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "anthropic-version", "value": "2023-06-01" },
-            { "name": "content-type", "value": "application/json" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: 'You are StockPulse generating a weekly portfolio review in Telegram markdown. Structure: 1) 📊 WEEK IN NUMBERS: Portfolio value change, best/worst stock, total trades. 2) 🏆 WINNERS & LOSERS: Top 3 each with % moves. 3) 🔮 PREDICTION SCORECARD: Accuracy rate, best/worst calls. 4) 📈 NEXT WEEK OUTLOOK: Key events, earnings, macro. 5) 💡 IMPROVEMENT NOTES: What went right/wrong. Keep under 500 words. Use ₹ for prices.', messages: [{ role: 'user', content: JSON.stringify($json.context) }] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: 'You are StockPulse generating a weekly portfolio review in Telegram markdown. Structure: 1) \ud83d\udcca WEEK IN NUMBERS: Portfolio value change, best/worst stock, total trades. 2) \ud83c\udfc6 WINNERS & LOSERS: Top 3 each with % moves. 3) \ud83d\udd2e PREDICTION SCORECARD: Accuracy rate, best/worst calls. 4) \ud83d\udcc8 NEXT WEEK OUTLOOK: Key events, earnings, macro. 5) \ud83d\udca1 IMPROVEMENT NOTES: What went right/wrong. Keep under 500 words. Use \u20b9 for prices.', messages: [{ role: 'user', content: JSON.stringify($json.context) }] }) }}"
       },
       "id": "claude-weekly-review",
       "name": "Claude: Weekly Review",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 500],
+      "position": [
+        1200,
+        500
+      ],
       "credentials": {
-        "httpHeaderAuth": { "id": "CLAUDE_CREDENTIAL_ID", "name": "Claude API" }
+        "httpHeaderAuth": {
+          "id": "Idkjo6pmv2QE4urQ",
+          "name": "Anthropic Header Auth"
+        }
       }
     },
     {
       "parameters": {
         "chatId": "={{ $('Assemble Weekly Context').item.json.chat_id }}",
         "text": "={{ $input.first().json.content.filter(c => c.type === 'text').map(c => c.text).join('') }}",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
       },
       "id": "send-weekly",
       "name": "Send Weekly Review",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1440, 500],
+      "position": [
+        1440,
+        500
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     }
   ],
   "connections": {
     "Sunday 10:00 AM": {
-      "main": [[{ "node": "Get Users", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Users": {
       "main": [
         [
-          { "node": "Get Week Snapshots", "type": "main", "index": 0 },
-          { "node": "Get Week Trades", "type": "main", "index": 0 },
-          { "node": "Get Week Predictions", "type": "main", "index": 0 }
+          {
+            "node": "Get Week Snapshots",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Week Trades",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Week Predictions",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Get Week Snapshots": {
-      "main": [[{ "node": "Assemble Weekly Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Assemble Weekly Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Week Trades": {
-      "main": [[{ "node": "Assemble Weekly Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Assemble Weekly Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Week Predictions": {
-      "main": [[{ "node": "Assemble Weekly Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Assemble Weekly Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Assemble Weekly Context": {
-      "main": [[{ "node": "Claude: Weekly Review", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Claude: Weekly Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Claude: Weekly Review": {
-      "main": [[{ "node": "Send Weekly Review", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Weekly Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }

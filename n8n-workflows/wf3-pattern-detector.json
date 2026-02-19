@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
         }
       },
       "id": "schedule-5min",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -21,52 +29,74 @@
       "name": "Market Hours?",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
-        "operation": "select",
+        "operation": "executeQuery",
         "query": "SELECT DISTINCT h.symbol, h.user_id, u.alerts_chat_id, u.private_chat_id FROM holdings h JOIN users u ON h.user_id = u.id WHERE h.net_quantity > 0 AND u.is_active = true UNION SELECT DISTINCT a.symbol, a.user_id, u.alerts_chat_id, u.private_chat_id FROM alerts a JOIN users u ON a.user_id = u.id WHERE a.status = 'active' AND u.is_active = true"
       },
       "id": "get-watched-symbols",
       "name": "Get Watched Symbols",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [660, 300],
+      "position": [
+        660,
+        300
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Build unique symbols list and fetch historical data from Kite\nconst items = $input.all().map(i => i.json);\nif (items.length === 0) return [];\n\nconst uniqueSymbols = [...new Set(items.map(i => i.symbol))];\n\n// We need the user→symbol mapping for notifications later\nconst userSymbolMap = {};\nfor (const item of items) {\n  if (!userSymbolMap[item.symbol]) userSymbolMap[item.symbol] = [];\n  userSymbolMap[item.symbol].push({\n    user_id: item.user_id,\n    chat_id: item.alerts_chat_id || item.private_chat_id\n  });\n}\n\nreturn [{\n  json: {\n    symbols: uniqueSymbols,\n    user_symbol_map: userSymbolMap,\n    date: $('Market Hours?').first().json.date\n  }\n}];"
+        "jsCode": "// Build unique symbols list and fetch historical data from Kite\nconst items = $input.all().map(i => i.json);\nif (items.length === 0) return [];\n\nconst uniqueSymbols = [...new Set(items.map(i => i.symbol))];\n\n// We need the user\u2192symbol mapping for notifications later\nconst userSymbolMap = {};\nfor (const item of items) {\n  if (!userSymbolMap[item.symbol]) userSymbolMap[item.symbol] = [];\n  userSymbolMap[item.symbol].push({\n    user_id: item.user_id,\n    chat_id: item.alerts_chat_id || item.private_chat_id\n  });\n}\n\nreturn [{\n  json: {\n    symbols: uniqueSymbols,\n    user_symbol_map: userSymbolMap,\n    date: $('Market Hours?').first().json.date\n  }\n}];"
       },
       "id": "build-symbol-list",
       "name": "Build Symbol List",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// For each symbol, fetch 30-day OHLC from Kite and detect patterns\n// This is a large Code node that contains the pattern detection engine\n\nconst { symbols, user_symbol_map, date } = $input.first().json;\nconst patterns = [];\n\n// Helper: calculate SMA\nfunction sma(data, period) {\n  if (data.length < period) return null;\n  const slice = data.slice(-period);\n  return slice.reduce((a, b) => a + b, 0) / period;\n}\n\n// Helper: calculate RSI (Wilder's smoothing)\nfunction rsi(closes, period = 14) {\n  if (closes.length < period + 1) return null;\n  let gains = 0, losses = 0;\n  for (let i = 1; i <= period; i++) {\n    const diff = closes[i] - closes[i-1];\n    if (diff > 0) gains += diff; else losses += Math.abs(diff);\n  }\n  let avgGain = gains / period;\n  let avgLoss = losses / period;\n  for (let i = period + 1; i < closes.length; i++) {\n    const diff = closes[i] - closes[i-1];\n    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;\n    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? Math.abs(diff) : 0)) / period;\n  }\n  if (avgLoss === 0) return 100;\n  const rs = avgGain / avgLoss;\n  return 100 - (100 / (1 + rs));\n}\n\n// Helper: Bollinger Bands\nfunction bollingerBands(closes, period = 20, mult = 2) {\n  if (closes.length < period) return null;\n  const slice = closes.slice(-period);\n  const mean = slice.reduce((a, b) => a + b, 0) / period;\n  const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;\n  const stdDev = Math.sqrt(variance);\n  return {\n    upper: mean + mult * stdDev,\n    middle: mean,\n    lower: mean - mult * stdDev,\n    bandwidth: (4 * mult * stdDev) / mean * 100\n  };\n}\n\n// Simulate fetching OHLC — in production, this would call Kite API\n// For now, structure the detection logic that processes candle data\n// NOTE: In real deployment, replace this with actual Kite HTTP call\n\nfor (const symbol of symbols) {\n  // Placeholder: In production, fetch from Kite API:\n  // GET https://api.kite.trade/instruments/historical/NSE:{symbol}/day\n  // ?from=30_days_ago&to=today\n  // For now, we define the pattern detection functions\n  \n  // These would run on actual candle data:\n  // const closes = candles.map(c => c.close);\n  // const volumes = candles.map(c => c.volume);\n  // const highs = candles.map(c => c.high);\n  // const lows = candles.map(c => c.low);\n  \n  // Pattern 1: SMA Crossover (5 crosses above 20)\n  // if (sma(closes, 5) > sma(closes, 20) && prev_sma5 <= prev_sma20)\n  //   patterns.push({ symbol, type: 'SMA_CROSS_BULLISH', ... });\n  \n  // Pattern 2: RSI Extreme\n  // const currentRSI = rsi(closes);\n  // if (currentRSI > 75) patterns.push({ type: 'RSI_OVERBOUGHT', ... });\n  // if (currentRSI < 25) patterns.push({ type: 'RSI_OVERSOLD', ... });\n  \n  // Pattern 3: Volume Spike (today > 2x 20-day avg)\n  // const avgVol = sma(volumes, 20);\n  // if (volumes[volumes.length-1] > 2 * avgVol) patterns.push({ type: 'VOLUME_SPIKE', ... });\n  \n  // Pattern 4: Bollinger Breakout\n  // const bb = bollingerBands(closes);\n  // if (closes[closes.length-1] > bb.upper) patterns.push({ type: 'BB_UPPER_BREAK', ... });\n  \n  // Pattern 5: Gap Up/Down (>2% gap from prev close)\n  // const gap = (open - prevClose) / prevClose * 100;\n  // if (gap > 2) patterns.push({ type: 'GAP_UP', ... });\n}\n\n// TEMPLATE: This is the structure that gets returned\n// In production, fill with actual detected patterns\nreturn [{\n  json: {\n    patterns_detected: patterns,\n    user_symbol_map: user_symbol_map,\n    date: date,\n    scan_time: new Date().toISOString(),\n    note: 'TEMPLATE: Replace Kite API calls with actual HTTP requests in production. The pattern detection logic above shows the algorithms to use.'\n  }\n}];"
+        "jsCode": "// For each symbol, fetch 30-day OHLC from Kite and detect patterns\n// This is a large Code node that contains the pattern detection engine\n\nconst { symbols, user_symbol_map, date } = $input.first().json;\nconst patterns = [];\n\n// Helper: calculate SMA\nfunction sma(data, period) {\n  if (data.length < period) return null;\n  const slice = data.slice(-period);\n  return slice.reduce((a, b) => a + b, 0) / period;\n}\n\n// Helper: calculate RSI (Wilder's smoothing)\nfunction rsi(closes, period = 14) {\n  if (closes.length < period + 1) return null;\n  let gains = 0, losses = 0;\n  for (let i = 1; i <= period; i++) {\n    const diff = closes[i] - closes[i-1];\n    if (diff > 0) gains += diff; else losses += Math.abs(diff);\n  }\n  let avgGain = gains / period;\n  let avgLoss = losses / period;\n  for (let i = period + 1; i < closes.length; i++) {\n    const diff = closes[i] - closes[i-1];\n    avgGain = (avgGain * (period - 1) + (diff > 0 ? diff : 0)) / period;\n    avgLoss = (avgLoss * (period - 1) + (diff < 0 ? Math.abs(diff) : 0)) / period;\n  }\n  if (avgLoss === 0) return 100;\n  const rs = avgGain / avgLoss;\n  return 100 - (100 / (1 + rs));\n}\n\n// Helper: Bollinger Bands\nfunction bollingerBands(closes, period = 20, mult = 2) {\n  if (closes.length < period) return null;\n  const slice = closes.slice(-period);\n  const mean = slice.reduce((a, b) => a + b, 0) / period;\n  const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;\n  const stdDev = Math.sqrt(variance);\n  return {\n    upper: mean + mult * stdDev,\n    middle: mean,\n    lower: mean - mult * stdDev,\n    bandwidth: (4 * mult * stdDev) / mean * 100\n  };\n}\n\n// Simulate fetching OHLC \u2014 in production, this would call Kite API\n// For now, structure the detection logic that processes candle data\n// NOTE: In real deployment, replace this with actual Kite HTTP call\n\nfor (const symbol of symbols) {\n  // Placeholder: In production, fetch from Kite API:\n  // GET https://api.kite.trade/instruments/historical/NSE:{symbol}/day\n  // ?from=30_days_ago&to=today\n  // For now, we define the pattern detection functions\n  \n  // These would run on actual candle data:\n  // const closes = candles.map(c => c.close);\n  // const volumes = candles.map(c => c.volume);\n  // const highs = candles.map(c => c.high);\n  // const lows = candles.map(c => c.low);\n  \n  // Pattern 1: SMA Crossover (5 crosses above 20)\n  // if (sma(closes, 5) > sma(closes, 20) && prev_sma5 <= prev_sma20)\n  //   patterns.push({ symbol, type: 'SMA_CROSS_BULLISH', ... });\n  \n  // Pattern 2: RSI Extreme\n  // const currentRSI = rsi(closes);\n  // if (currentRSI > 75) patterns.push({ type: 'RSI_OVERBOUGHT', ... });\n  // if (currentRSI < 25) patterns.push({ type: 'RSI_OVERSOLD', ... });\n  \n  // Pattern 3: Volume Spike (today > 2x 20-day avg)\n  // const avgVol = sma(volumes, 20);\n  // if (volumes[volumes.length-1] > 2 * avgVol) patterns.push({ type: 'VOLUME_SPIKE', ... });\n  \n  // Pattern 4: Bollinger Breakout\n  // const bb = bollingerBands(closes);\n  // if (closes[closes.length-1] > bb.upper) patterns.push({ type: 'BB_UPPER_BREAK', ... });\n  \n  // Pattern 5: Gap Up/Down (>2% gap from prev close)\n  // const gap = (open - prevClose) / prevClose * 100;\n  // if (gap > 2) patterns.push({ type: 'GAP_UP', ... });\n}\n\n// TEMPLATE: This is the structure that gets returned\n// In production, fill with actual detected patterns\nreturn [{\n  json: {\n    patterns_detected: patterns,\n    user_symbol_map: user_symbol_map,\n    date: date,\n    scan_time: new Date().toISOString(),\n    note: 'TEMPLATE: Replace Kite API calls with actual HTTP requests in production. The pattern detection logic above shows the algorithms to use.'\n  }\n}];"
       },
       "id": "detect-patterns",
       "name": "Detect Patterns",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 300]
+      "position": [
+        1100,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "has-patterns",
               "leftValue": "={{ $json.patterns_detected.length }}",
               "rightValue": "0",
-              "operator": { "type": "number", "operation": "gt" }
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
             }
           ],
           "combinator": "and"
@@ -76,47 +106,64 @@
       "name": "Patterns Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1320, 300]
+      "position": [
+        1320,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Check pattern_alerts_log to avoid duplicate notifications\n// Then format and send to each affected user\nconst { patterns_detected, user_symbol_map, date } = $input.first().json;\nconst notifications = [];\n\nfor (const pattern of patterns_detected) {\n  const users = user_symbol_map[pattern.symbol] || [];\n  \n  let emoji = '📊';\n  switch (pattern.type) {\n    case 'SMA_CROSS_BULLISH': emoji = '🟢 Golden Cross'; break;\n    case 'SMA_CROSS_BEARISH': emoji = '🔴 Death Cross'; break;\n    case 'RSI_OVERBOUGHT': emoji = '🔥 Overbought'; break;\n    case 'RSI_OVERSOLD': emoji = '❄️ Oversold'; break;\n    case 'VOLUME_SPIKE': emoji = '📢 Volume Spike'; break;\n    case 'BB_UPPER_BREAK': emoji = '🚀 Bollinger Breakout'; break;\n    case 'BB_LOWER_BREAK': emoji = '💥 Bollinger Breakdown'; break;\n    case 'GAP_UP': emoji = '⬆️ Gap Up'; break;\n    case 'GAP_DOWN': emoji = '⬇️ Gap Down'; break;\n    case 'MACD_CROSS_BULL': emoji = '📈 MACD Bullish'; break;\n    case 'MACD_CROSS_BEAR': emoji = '📉 MACD Bearish'; break;\n  }\n  \n  const message = `${emoji}\\n` +\n    `*${pattern.symbol}* — ${pattern.description || pattern.type}\\n` +\n    `Price: ₹${pattern.price || 'N/A'} | ${pattern.detail || ''}`;\n  \n  for (const user of users) {\n    notifications.push({\n      user_id: user.user_id,\n      chat_id: user.chat_id,\n      symbol: pattern.symbol,\n      pattern_type: pattern.type,\n      message: message,\n      date: date\n    });\n  }\n}\n\nreturn notifications.map(n => ({ json: n }));"
+        "jsCode": "// Check pattern_alerts_log to avoid duplicate notifications\n// Then format and send to each affected user\nconst { patterns_detected, user_symbol_map, date } = $input.first().json;\nconst notifications = [];\n\nfor (const pattern of patterns_detected) {\n  const users = user_symbol_map[pattern.symbol] || [];\n  \n  let emoji = '\ud83d\udcca';\n  switch (pattern.type) {\n    case 'SMA_CROSS_BULLISH': emoji = '\ud83d\udfe2 Golden Cross'; break;\n    case 'SMA_CROSS_BEARISH': emoji = '\ud83d\udd34 Death Cross'; break;\n    case 'RSI_OVERBOUGHT': emoji = '\ud83d\udd25 Overbought'; break;\n    case 'RSI_OVERSOLD': emoji = '\u2744\ufe0f Oversold'; break;\n    case 'VOLUME_SPIKE': emoji = '\ud83d\udce2 Volume Spike'; break;\n    case 'BB_UPPER_BREAK': emoji = '\ud83d\ude80 Bollinger Breakout'; break;\n    case 'BB_LOWER_BREAK': emoji = '\ud83d\udca5 Bollinger Breakdown'; break;\n    case 'GAP_UP': emoji = '\u2b06\ufe0f Gap Up'; break;\n    case 'GAP_DOWN': emoji = '\u2b07\ufe0f Gap Down'; break;\n    case 'MACD_CROSS_BULL': emoji = '\ud83d\udcc8 MACD Bullish'; break;\n    case 'MACD_CROSS_BEAR': emoji = '\ud83d\udcc9 MACD Bearish'; break;\n  }\n  \n  const message = `${emoji}\\n` +\n    `*${pattern.symbol}* \u2014 ${pattern.description || pattern.type}\\n` +\n    `Price: \u20b9${pattern.price || 'N/A'} | ${pattern.detail || ''}`;\n  \n  for (const user of users) {\n    notifications.push({\n      user_id: user.user_id,\n      chat_id: user.chat_id,\n      symbol: pattern.symbol,\n      pattern_type: pattern.type,\n      message: message,\n      date: date\n    });\n  }\n}\n\nreturn notifications.map(n => ({ json: n }));"
       },
       "id": "format-notifications",
       "name": "Format Pattern Notifications",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 200]
+      "position": [
+        1540,
+        200
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO pattern_alerts_log (user_id, symbol, pattern_type, alert_date) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, symbol, pattern_type, alert_date) DO NOTHING RETURNING id",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.user_id, $json.symbol, $json.pattern_type, $json.date] }}"
-          }
+          "queryReplacement": "={{ [$json.user_id, $json.symbol, $json.pattern_type, $json.date] }}"
         }
       },
       "id": "log-pattern",
       "name": "Log Pattern (Dedup)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1760, 200],
+      "position": [
+        1760,
+        200
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "was-new",
               "leftValue": "={{ $json.id }}",
               "rightValue": "",
-              "operator": { "type": "exists", "operation": "exists" }
+              "operator": {
+                "type": "exists",
+                "operation": "exists"
+              }
             }
           ],
           "combinator": "and"
@@ -126,7 +173,10 @@
       "name": "New Pattern?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1980, 200]
+      "position": [
+        1980,
+        200
+      ]
     },
     {
       "parameters": {
@@ -134,56 +184,136 @@
         "text": "={{ $('Format Pattern Notifications').item.json.message }}",
         "additionalFields": {
           "parse_mode": "Markdown",
-          "reply_markup": "={{ JSON.stringify({ inline_keyboard: [[ { text: '📊 Full Analysis', callback_data: 'predict_' + $('Format Pattern Notifications').item.json.symbol }, { text: '🔔 Set Alert', callback_data: 'alert_prompt_' + $('Format Pattern Notifications').item.json.symbol } ]] }) }}"
+          "reply_markup": "={{ JSON.stringify({ inline_keyboard: [[ { text: '\ud83d\udcca Full Analysis', callback_data: 'predict_' + $('Format Pattern Notifications').item.json.symbol }, { text: '\ud83d\udd14 Set Alert', callback_data: 'alert_prompt_' + $('Format Pattern Notifications').item.json.symbol } ]] }) }}"
         }
       },
       "id": "send-pattern-alert",
       "name": "Send Pattern Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2200, 100],
+      "position": [
+        2200,
+        100
+      ],
       "credentials": {
-        "telegramApi": { "id": "TELEGRAM_CREDENTIAL_ID", "name": "StockPulse Bot" }
+        "telegramApi": {
+          "id": "oh2jj2bRbyNVQvgB",
+          "name": "Telegram account"
+        }
       }
     }
   ],
   "connections": {
     "Every 5 Minutes": {
-      "main": [[{ "node": "Market Hours?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Market Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Market Hours?": {
-      "main": [[{ "node": "Get Watched Symbols", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get Watched Symbols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Watched Symbols": {
-      "main": [[{ "node": "Build Symbol List", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Symbol List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Symbol List": {
-      "main": [[{ "node": "Detect Patterns", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Detect Patterns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Detect Patterns": {
-      "main": [[{ "node": "Patterns Found?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Patterns Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Patterns Found?": {
       "main": [
-        [{ "node": "Format Pattern Notifications", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Format Pattern Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Format Pattern Notifications": {
-      "main": [[{ "node": "Log Pattern (Dedup)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Pattern (Dedup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Pattern (Dedup)": {
-      "main": [[{ "node": "New Pattern?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "New Pattern?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "New Pattern?": {
       "main": [
-        [{ "node": "Send Pattern Alert", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Send Pattern Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }

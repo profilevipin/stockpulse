@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "cronExpression", "expression": "30 7 * * 1-5" }]
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * 1-5"
+            }
+          ]
         }
       },
       "id": "cron-730am",
       "name": "7:30 AM Mon-Fri",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -23,7 +31,11 @@
       "name": "NSE Service: FII/DII",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 200]
+      "position": [
+        440,
+        200
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -35,7 +47,11 @@
       "name": "NSE Service: Most Active",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 400]
+      "position": [
+        440,
+        400
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -47,35 +63,46 @@
       "name": "NSE Service: Pre-Market",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 600]
+      "position": [
+        440,
+        600
+      ],
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Combine FII/DII + most active + pre-market data\nconst fiiDii = $('NSE Service: FII/DII').first().json;\nconst mostActive = $('NSE Service: Most Active').first().json;\nconst preMarket = $('NSE Service: Pre-Market').first().json;\n\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\nconst dateStr = ist.toISOString().split('T')[0];\n\nconst combinedData = {\n  fii_dii: fiiDii,\n  most_active_stocks: mostActive,\n  pre_market: preMarket,\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: dateStr } }];"
+        "jsCode": "// Combine FII/DII + most active + pre-market data with error handling\nlet fiiDii = {};\nlet mostActive = {};\nlet preMarket = {};\n\ntry { fiiDii = $('NSE Service: FII/DII').first().json; } catch (e) { fiiDii = { error: 'FII/DII data unavailable', details: e.message }; }\ntry { mostActive = $('NSE Service: Most Active').first().json; } catch (e) { mostActive = { error: 'Most active data unavailable', details: e.message }; }\ntry { preMarket = $('NSE Service: Pre-Market').first().json; } catch (e) { preMarket = { error: 'Pre-market data unavailable', details: e.message }; }\n\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst ist = new Date(now.getTime() + istOffset + now.getTimezoneOffset() * 60 * 1000);\nconst dateStr = ist.toISOString().split('T')[0];\n\nconst combinedData = {\n  fii_dii: fiiDii,\n  most_active_stocks: mostActive,\n  pre_market: preMarket,\n  collected_at: new Date().toISOString()\n};\n\nreturn [{ json: { data: combinedData, date: dateStr } }];"
       },
       "id": "combine-flow-data",
       "name": "Combine Flow Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 400]
+      "position": [
+        720,
+        400
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
+        "operation": "executeQuery",
         "query": "INSERT INTO staging_data (data_date, data_type, data) VALUES ($1, 'fii_dii', $2) ON CONFLICT (data_date, data_type, symbol) DO UPDATE SET data = $2, updated_at = NOW()",
         "options": {
-          "queryParameterBindings": {
-            "bindings": "={{ [$json.date, JSON.stringify($json.data)] }}"
-          }
+          "queryReplacement": "={{ [$json.date, JSON.stringify($json.data)] }}"
         }
       },
       "id": "store-flow-staging",
       "name": "Store in Staging",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [940, 400],
+      "position": [
+        940,
+        400
+      ],
       "credentials": {
-        "postgres": { "id": "POSTGRES_CREDENTIAL_ID", "name": "StockPulse DB" }
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
       }
     }
   ],
@@ -83,27 +110,80 @@
     "7:30 AM Mon-Fri": {
       "main": [
         [
-          { "node": "NSE Service: FII/DII", "type": "main", "index": 0 },
-          { "node": "NSE Service: Most Active", "type": "main", "index": 0 },
-          { "node": "NSE Service: Pre-Market", "type": "main", "index": 0 }
+          {
+            "node": "NSE Service: FII/DII",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NSE Service: Most Active",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "NSE Service: Pre-Market",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "NSE Service: FII/DII": {
-      "main": [[{ "node": "Combine Flow Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Flow Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "NSE Service: Most Active": {
-      "main": [[{ "node": "Combine Flow Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Flow Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "NSE Service: Pre-Market": {
-      "main": [[{ "node": "Combine Flow Data", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Combine Flow Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Combine Flow Data": {
-      "main": [[{ "node": "Store in Staging", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Store in Staging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "StockPulse" }, { "name": "Morning Pipeline" }],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "StockPulse"
+    },
+    {
+      "name": "Morning Pipeline"
+    }
+  ],
   "triggerCount": 1,
   "active": false
 }
