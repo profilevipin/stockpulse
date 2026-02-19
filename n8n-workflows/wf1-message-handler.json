@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-19T05:02:15.634Z",
+    "updatedAt": "2026-02-19T06:42:32.626Z",
     "createdAt": "2026-02-18T07:36:36.580Z",
     "id": "kGn3KwIfHldiwuGW",
     "name": "WF1 \u2014 Message Handler",
@@ -972,10 +972,16 @@
                                         "operator": {
                                             "type": "string",
                                             "operation": "equals"
-                                        }
+                                        },
+                                        "id": "rule-login-0-0"
                                     }
                                 ],
-                                "combinator": "and"
+                                "combinator": "and",
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                }
                             }
                         },
                         {
@@ -988,10 +994,16 @@
                                         "operator": {
                                             "type": "string",
                                             "operation": "equals"
-                                        }
+                                        },
+                                        "id": "rule-login-1-0"
                                     }
                                 ],
-                                "combinator": "and"
+                                "combinator": "and",
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                }
                             }
                         }
                     ]
@@ -2623,9 +2635,9 @@
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
-    "activeVersionId": "2423dad6-2527-4850-a695-0b02d471da73",
-    "versionCounter": 142,
+    "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
+    "activeVersionId": "932651ba-6efc-457c-a943-ce09570ebc25",
+    "versionCounter": 145,
     "triggerCount": 1,
     "shared": [
         {
@@ -2648,9 +2660,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-19T05:02:15.642Z",
-        "createdAt": "2026-02-19T05:02:15.642Z",
-        "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
+        "updatedAt": "2026-02-19T06:42:32.629Z",
+        "createdAt": "2026-02-19T06:42:32.629Z",
+        "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
         "workflowId": "kGn3KwIfHldiwuGW",
         "nodes": [
             {
@@ -3618,10 +3630,16 @@
                                             "operator": {
                                                 "type": "string",
                                                 "operation": "equals"
-                                            }
+                                            },
+                                            "id": "rule-login-0-0"
                                         }
                                     ],
-                                    "combinator": "and"
+                                    "combinator": "and",
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict"
+                                    }
                                 }
                             },
                             {
@@ -3634,10 +3652,16 @@
                                             "operator": {
                                                 "type": "string",
                                                 "operation": "equals"
-                                            }
+                                            },
+                                            "id": "rule-login-1-0"
                                         }
                                     ],
-                                    "combinator": "and"
+                                    "combinator": "and",
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict"
+                                    }
                                 }
                             }
                         ]
@@ -5267,34 +5291,18 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-19T05:02:16.854Z",
-                "id": 195,
+                "createdAt": "2026-02-19T06:42:33.555Z",
+                "id": 211,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
+                "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T05:02:19.298Z",
-                "id": 196,
+                "createdAt": "2026-02-19T06:42:35.012Z",
+                "id": 212,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
-                "event": "activated",
-                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
-            },
-            {
-                "createdAt": "2026-02-19T05:02:22.287Z",
-                "id": 197,
-                "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
-                "event": "deactivated",
-                "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
-            },
-            {
-                "createdAt": "2026-02-19T05:02:23.959Z",
-                "id": 198,
-                "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "2423dad6-2527-4850-a695-0b02d471da73",
+                "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }
