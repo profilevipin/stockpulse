@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-19T03:44:35.438Z",
+    "updatedAt": "2026-02-19T04:25:27.568Z",
     "createdAt": "2026-02-18T07:36:36.580Z",
     "id": "kGn3KwIfHldiwuGW",
     "name": "WF1 \u2014 Message Handler",
@@ -539,7 +539,8 @@
                 "text": "={{ '\u2705 *BUY Logged*\\n\\n' + '\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + '   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n' + '   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n' + '   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price).toLocaleString() + '\\n\\n' + '\ud83d\udca1 Set a price alert: `alert ' + $('Parse Claude Response').item.json.symbol + ' LOWER-UPPER`' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"Analyze\", callback_data: \"predict_\" + $(\"Parse Claude Response\").item.json.symbol}, {text: \"Set Alert\", callback_data: \"alert_prompt_\" + $(\"Parse Claude Response\").item.json.symbol}], [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Briefing\", callback_data: \"briefing\"}]]}) }}"
                 }
             },
             "id": "confirm-buy",
@@ -647,7 +648,8 @@
                 "text": "={{ $json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}, {\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}], [{\"text\": \"Sync Kite\", \"callback_data\": \"sync\"}, {\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                 }
             },
             "id": "send-portfolio",
@@ -671,7 +673,8 @@
                 "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 live holdings + P&L\n`sync` \u2014 sync from Kite (User 1)\n\n\ud83d\udd2e *AI Analysis*\n`analyze RELIANCE` \u2014 deep AI analysis\n`analyze TCS 4000` \u2014 analysis with target\n\n\u2753 *Ask Anything*\n`why did Reliance fall?`\n`top 5 losses in my portfolio`\n`what should I sell?`\n`how is my portfolio doing?`\n\n\ud83c\udf05 *Briefing*\n`briefing` \u2014 morning AI analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}, {\"text\": \"Sync\", \"callback_data\": \"sync\"}]]}"
                 }
             },
             "id": "handle-help",
@@ -695,7 +698,8 @@
                 "text": "={{ '\ud83e\udd14 I didn\\'t understand that.\\n\\n' + 'You said: \"' + $(\\'Prepare User Context\\').item.json.message_text + '\"\\n\\n' + 'Try:\\n' + '\u2022 `analyze RELIANCE` \u2014 deep AI stock analysis\\n' + '\u2022 `portfolio` \u2014 see holdings with live P&L\\n' + '\u2022 `why did X fall?` \u2014 ask me anything\\n' + '\u2022 `help` \u2014 all commands' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Help\", \"callback_data\": \"help\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}]]}"
                 }
             },
             "id": "handle-unknown",
@@ -810,7 +814,8 @@
                 "text": "={{ $json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                 }
             },
             "id": "send-alerts-list",
@@ -870,7 +875,8 @@
                 "text": "={{ $input.all().length > 0 ? '\u2705 Alert for *' + $('Prepare Alert Cancel').first().json.symbol + '* cancelled.' : '\u26a0\ufe0f No active alert found for *' + $('Prepare Alert Cancel').first().json.symbol + '*.' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}]]}"
                 }
             },
             "id": "confirm-alert-cancel",
@@ -908,7 +914,8 @@
                 "text": "={{ '\u2705 *SELL Logged*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price) + '\\n\\n\ud83d\udcc1 View with: `portfolio`' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Analyze\", callback_data: \"predict_\" + $(\"Parse Claude Response\").item.json.symbol}], [{text: \"Briefing\", callback_data: \"briefing\"}]]}) }}"
                 }
             },
             "id": "confirm-sell",
@@ -932,7 +939,8 @@
                 "text": "={{ '\ud83d\udd14 *Alert Set*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + ($('Parse Claude Response').item.json.lower_bound ? '   \u2b07\ufe0f Lower: \u20b9' + $('Parse Claude Response').item.json.lower_bound + '\\n' : '') + ($('Parse Claude Response').item.json.upper_bound ? '   \u2b06\ufe0f Upper: \u20b9' + $('Parse Claude Response').item.json.upper_bound + '\\n' : '') + '\\nView alerts: `alerts`\\nCancel: `cancel alert ' + $('Parse Claude Response').item.json.symbol + '`' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"My Alerts\", callback_data: \"alerts\"}, {text: \"Analyze\", callback_data: \"predict_\" + $json.symbol}], [{text: \"Cancel Alert\", callback_data: \"cancel_alert_\" + $json.symbol}, {text: \"Portfolio\", callback_data: \"portfolio\"}]]}) }}"
                 }
             },
             "id": "confirm-alert-set",
@@ -1028,7 +1036,8 @@
                 "text": "={{ '\u2705 *Kite Login Successful!*\\n\\nYour Zerodha session is now active.\\nToken valid until: ' + new Date($input.first().json.token_expiry).toLocaleString(\"en-IN\", {timeZone: \"Asia/Kolkata\"}) + ' IST\\n\\nLive data is now enabled. Your morning briefing will include live price data.' }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Sync Portfolio\", \"callback_data\": \"sync\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}]]}"
                 }
             },
             "id": "confirm-login",
@@ -1052,7 +1061,8 @@
                 "text": "\ud83d\udd11 *Kite Connect Login*\n\n1. Click the link below to login:\n[Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2. Complete Zerodha login\n3. From the redirect URL, copy the full URL or just the `request_token` value\n4. Send: `login YOUR_TOKEN`\n\nOr send your existing token directly:\n`login api_key:access_token`",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Help\", \"callback_data\": \"help\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}]]}"
                 }
             },
             "id": "login-instructions",
@@ -1072,7 +1082,7 @@
         },
         {
             "parameters": {
-                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't analyze this stock right now. Please try again in a moment.\";\n  } else {\n    answer = \"\u26a0\ufe0f Analysis unavailable. Try again or use a different stock symbol.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't analyze this stock right now. Please try again.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starCount = (sanitized.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n  const underCount = (sanitized.match(/_/g) || []).length;\n  if (underCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('_');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized } }];"
+                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nconst symbol = ctx.symbol || 'UNKNOWN';\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't analyze this stock right now. Please try again in a moment.\";\n  } else {\n    answer = \"\\u26a0\\ufe0f Analysis unavailable. Try again or use a different stock symbol.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't analyze this stock right now. Please try again.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starCount = (sanitized.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Set Alert\", callback_data: \"alert_prompt_\" + symbol}, {text: \"Portfolio\", callback_data: \"portfolio\"}],\n    [{text: \"Briefing\", callback_data: \"briefing\"}, {text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized, symbol: symbol, reply_markup: JSON.stringify(buttons) } }];"
             },
             "id": "format-predict",
             "name": "Format Analysis",
@@ -1089,7 +1099,8 @@
                 "text": "={{ $json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ $json.reply_markup }}"
                 }
             },
             "id": "send-predict",
@@ -1116,7 +1127,7 @@
                     "parameters": [
                         {
                             "name": "Authorization",
-                            "value": "={ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }"
+                            "value": "={{ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }}"
                         },
                         {
                             "name": "X-Kite-Version",
@@ -1202,7 +1213,8 @@
                 "text": "\u26a0\ufe0f *Kite Session Required*\n\nYour Kite token has expired or is not set.\n\nTo sync your portfolio:\n1. Get a fresh access token from Kite\n2. Send: `login api_key:access_token`\n\nThen try `sync` again.",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Login\", \"callback_data\": \"login\"}, {\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                 }
             },
             "credentials": {
@@ -1238,10 +1250,12 @@
                         "response": {
                             "responseFormat": "json"
                         }
-                    }
+                    },
+                    "neverError": true
                 },
                 "onError": "continueRegularOutput"
-            }
+            },
+            "onError": "continueRegularOutput"
         },
         {
             "id": "sync-build-sql",
@@ -1253,7 +1267,7 @@
                 980
             ],
             "parameters": {
-                "jsCode": "const userId = $(\"Parse Claude Response\").item.json.user_id;\nconst response = $(\"Fetch Kite Holdings\").item.json;\nconst holdings = response.data || [];\n\nif (holdings.length === 0) {\n  return [{ json: {\n    sql: 'SELECT 1 AS synced_count',\n    count: 0,\n    sample: 'No holdings returned from Kite'\n  }}];\n}\n\nconst values = holdings.map(h => {\n  const sym = h.tradingsymbol.replace(/'/g, \"''\");\n  const qty = parseInt(h.quantity);\n  const price = parseFloat(h.average_price).toFixed(2);\n  return `(${userId}, '${sym}', 'BUY', ${qty}, ${price}, 'kite_sync', CURRENT_DATE)`;\n}).join(',\\n');\n\nconst sql = `DELETE FROM trades WHERE user_id=${userId} AND source='kite_sync';\\nINSERT INTO trades (user_id, symbol, trade_type, quantity, price, source, trade_date) VALUES\\n${values};`;\n\nconst sample = holdings.slice(0, 3).map(h =>\n  `${h.tradingsymbol} (${h.quantity}@\\u20b9${parseFloat(h.average_price).toFixed(0)})`\n).join(', ');\n\nreturn [{ json: { sql, count: holdings.length, sample } }];"
+                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nconst kiteResponse = $input.first().json;\n\nif (kiteResponse.error_type || kiteResponse.status === 'error' || !kiteResponse.data) {\n  const errorMsg = kiteResponse.message || kiteResponse.error_type || 'Kite API error';\n  return [{ json: {\n    sql: null, error: true, chat_id: ctx.chat_id, user_id: ctx.user_id, count: 0,\n    message: '\\u26a0\\ufe0f *Kite Sync Failed*\\n\\nError: ' + errorMsg + '\\n\\nYour Kite session may have expired. Please login again:\\n`login`'\n  }}];\n}\n\nconst holdings = kiteResponse.data || [];\nif (holdings.length === 0) {\n  return [{ json: { sql: 'SELECT 1', error: false, chat_id: ctx.chat_id, user_id: ctx.user_id, count: 0, message: 'No holdings found in your Kite account.' }}];\n}\n\nlet sql = 'DELETE FROM trades WHERE user_id = ' + ctx.user_id + \" AND source = 'kite_sync';\\n\";\nconst values = holdings.map(h => {\n  const symbol = h.tradingsymbol.replace(/'/g, \"''\");\n  const qty = parseInt(h.quantity) || 0;\n  const price = parseFloat(h.average_price) || 0;\n  return '(' + ctx.user_id + \", '\" + symbol + \"', 'BUY', \" + qty + ', ' + price + \", 'kite_sync', CURRENT_DATE)\";\n});\nsql += 'INSERT INTO trades (user_id, symbol, trade_type, quantity, price, source, trade_date) VALUES\\n' + values.join(',\\n') + ';';\n\nreturn [{ json: { sql: sql, error: false, chat_id: ctx.chat_id, user_id: ctx.user_id, count: holdings.length,\n  message: '\\u2705 *Portfolio Synced!*\\n\\nImported *' + holdings.length + '* holdings from Zerodha Kite.\\nUse `portfolio` to see your updated holdings.'\n}}];"
             }
         },
         {
@@ -1274,7 +1288,9 @@
                     "id": "6dSdIQ2xAFPzyEwe",
                     "name": "Postgres account"
                 }
-            }
+            },
+            "onError": "continueRegularOutput",
+            "alwaysOutputData": true
         },
         {
             "id": "sync-format-result",
@@ -1286,7 +1302,7 @@
                 1200
             ],
             "parameters": {
-                "jsCode": "const count = $(\"Build Sync SQL\").item.json.count;\nconst sample = $(\"Build Sync SQL\").item.json.sample;\nconst chatId = $(\"Parse Claude Response\").item.json.chat_id;\n\nreturn [{ json: {\n  chat_id: chatId,\n  message: `\\u2705 *Portfolio Synced!*\\n\\nImported *${count} holdings* from Kite Connect.\\n\\nSample: ${sample}...\\n\\nSend \\`portfolio\\` to view your holdings.`\n}}];"
+                "jsCode": "const prev = $('Build Sync SQL').first().json;\nreturn [{ json: { chat_id: prev.chat_id, message: prev.message, count: prev.count }}];"
             }
         },
         {
@@ -1303,7 +1319,8 @@
                 "text": "={{ $json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}]]}"
                 }
             },
             "credentials": {
@@ -1351,7 +1368,7 @@
                     "parameters": [
                         {
                             "name": "Authorization",
-                            "value": "={ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }"
+                            "value": "={{ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }}"
                         },
                         {
                             "name": "X-Kite-Version",
@@ -1422,7 +1439,7 @@
                 },
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-20250514',\n  max_tokens: 2000,\n  system: 'You are StockPulse, an expert Indian stock market analyst specializing in NSE/BSE equities. Provide detailed, actionable analysis personalized to the user\\'s position. Use Rs. for prices. Format for Telegram with *bold* for emphasis. Keep under 700 words.\\n\\nAlways include:\\n1. CLEAR SIGNAL - State one of: *STRONG BUY* / *BUY* / *HOLD* / *SELL* / *STRONG SELL* with a 1-line reason. Put this FIRST.\\n2. TECHNICAL SNAPSHOT - Trend direction, RSI zone (overbought/oversold/neutral), MACD signal, key support & resistance levels with prices\\n3. NEWS & SENTIMENT - Any recent developments, earnings, or sentiment shifts from available data\\n4. PRICE TARGETS - Upside target, downside risk, and stop-loss level\\n5. ACTIONABLE ADVICE - Specific action: \\\"Add more if it dips below Rs.X\\\" or \\\"Book partial profits above Rs.Y\\\" or \\\"Hold with stop-loss at Rs.Z\\\"\\n\\nBe specific with numbers. Every recommendation must have a price level.',\n  messages: [{\n    role: 'user',\n    content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\nLive Quote: ' + JSON.stringify($('Fetch Kite Quote').item.json) + '\\n\\nStaged Data (last 7 days): ' + JSON.stringify($input.all().map(function(i){ return { type: i.json.data_type, data: i.json.data }; })) + '\\n\\nUser target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none')\n  }]\n}) }}"
+                "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2000,  system: 'You are StockPulse, an expert Indian stock market analyst specializing in NSE/BSE equities. Provide detailed, actionable analysis personalized to the user\\'s position. Use Rs. for prices. Format for Telegram with *bold* for emphasis. Keep under 700 words.\\n\\nAlways include:\\n1. CLEAR SIGNAL - State one of: *STRONG BUY* / *BUY* / *HOLD* / *SELL* / *STRONG SELL* with a 1-line reason. Put this FIRST.\\n2. POSITION SUMMARY - If user holds this stock, state: quantity held, avg buy price, current price, unrealized P&L in Rs. and %\\n3. TECHNICAL SNAPSHOT - Trend direction, RSI zone, MACD signal, key support & resistance levels with prices\\n4. NEWS & SENTIMENT - Recent developments from available data\\n5. PRICE TARGETS - Upside target, downside risk, stop-loss level\\n6. ACTIONABLE ADVICE - Specific action with price levels\\n\\nIf user does NOT hold this stock, focus on whether it is a good entry point and at what price.\\nBe specific with numbers. Every recommendation must have a price level.',  messages: [{    role: 'user',    content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\nLive Quote: ' + JSON.stringify($('Fetch Kite Quote').item.json) + '\\n\\nStaged Data (last 7 days): ' + JSON.stringify($input.all().map(function(i){ return { type: i.json.data_type, data: i.json.data }; })) + '\\n\\nMy position: ' + (function(){ try { var items = $('Fetch Analyze Holding').all(); if(items.length > 0 && items[0].json.symbol) { return JSON.stringify({symbol: items[0].json.symbol, qty: items[0].json.net_quantity, avg_price: items[0].json.avg_buy_price, invested: items[0].json.total_invested}); } return 'Not held'; } catch(e) { return 'Not held'; } })() + '\\n\\nUser target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none')  }]}) }}"
             },
             "credentials": {
                 "httpHeaderAuth": {
@@ -1505,7 +1522,7 @@
                 580
             ],
             "parameters": {
-                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't process that question right now. Please try again in a moment.\";\n  } else {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  // Remove code block language hints that Telegram doesn't support\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  // Fix unmatched bold markers\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    // Find last * and escape it\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n  // Fix unmatched italic markers\n  const underPairs = (sanitized.match(/_/g) || []).length;\n  if (underPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('_');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized } }];"
+                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question right now. Please try again in a moment.\";\n  } else {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n}\n\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Briefing\", callback_data: \"briefing\"}],\n    [{text: \"My Alerts\", callback_data: \"alerts\"}, {text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized, reply_markup: JSON.stringify(buttons) } }];"
             }
         },
         {
@@ -1522,7 +1539,8 @@
                 "text": "={{ $('Format Ask Response').item.json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ $json.reply_markup || '' }}"
                 }
             },
             "credentials": {
@@ -1564,7 +1582,7 @@
             "type": "n8n-nodes-base.httpRequest",
             "typeVersion": 4.2,
             "position": [
-                2860,
+                2960,
                 500
             ],
             "credentials": {
@@ -1594,7 +1612,7 @@
                 },
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-20250514',\n  max_tokens: 2500,\n  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, estimated current value (if data available), top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Current status from available data\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch today\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns about holdings\\n\\nBe specific with numbers. Use Rs. for prices. Use emojis sparingly. End with disclaimer: Technical analysis only, not financial advice.',\n  messages: [{\n    role: 'user',\n    content: 'Generate my market briefing.\\n\\nMy holdings:\\n' + JSON.stringify($input.all().filter(function(i){ return i.json.symbol; }).map(function(i){ return { symbol: i.json.symbol, qty: i.json.net_quantity, avg_price: i.json.avg_buy_price, invested: i.json.total_invested, market_data: i.json.latest_data, global_cues: i.json.global_cues, fii_dii: i.json.fii_dii }; })) + '\\n\\nProvide a comprehensive briefing with actionable signals for each stock.'\n  }]\n}) }}"
+                "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2500,  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with disclaimer: Technical analysis only, not financial advice.',  messages: [{    role: 'user',    content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)  }]}) }}"
             }
         },
         {
@@ -1603,11 +1621,11 @@
             "type": "n8n-nodes-base.code",
             "typeVersion": 2,
             "position": [
-                3060,
+                3160,
                 500
             ],
             "parameters": {
-                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't generate your briefing right now. The scheduled briefing will arrive at 8:30 AM IST on the next trading day.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't generate your briefing right now. The scheduled briefing will arrive at 8:30 AM IST on the next trading day.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\n// Split long messages for Telegram (4096 char limit)\nconst MAX_LEN = 4000;\nif (sanitized.length <= MAX_LEN) {\n  return [{ json: { chat_id: ctx.chat_id, message: sanitized } }];\n}\n\n// Split at paragraph breaks\nconst parts = [];\nlet current = '';\nconst paragraphs = sanitized.split('\\n\\n');\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > MAX_LEN && current) {\n    parts.push(current.trim());\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current.trim()) parts.push(current.trim());\n\nreturn parts.map(p => ({ json: { chat_id: ctx.chat_id, message: p } }));"
+                "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't generate your briefing right now. Please try again.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't generate your briefing right now. Please try again.\";\n}\n\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"My Alerts\", callback_data: \"alerts\"}],\n    [{text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\n// Split long messages for Telegram (4096 char limit)\nconst MAX_LEN = 4000;\nif (sanitized.length <= MAX_LEN) {\n  return [{ json: { chat_id: ctx.chat_id, message: sanitized, reply_markup: JSON.stringify(buttons) } }];\n}\n\nconst parts = [];\nlet current = '';\nconst paragraphs = sanitized.split('\\n\\n');\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > MAX_LEN && current) {\n    parts.push(current.trim());\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current.trim()) parts.push(current.trim());\n\nreturn parts.map((p, i) => ({\n  json: {\n    chat_id: ctx.chat_id,\n    message: p,\n    reply_markup: i === parts.length - 1 ? JSON.stringify(buttons) : ''\n  }\n}));"
             }
         },
         {
@@ -1616,7 +1634,7 @@
             "type": "n8n-nodes-base.telegram",
             "typeVersion": 1.2,
             "position": [
-                3260,
+                3360,
                 500
             ],
             "credentials": {
@@ -1631,7 +1649,8 @@
                 "text": "={{ $json.message }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ $json.reply_markup || '' }}"
                 }
             }
         },
@@ -1778,6 +1797,116 @@
                     "parse_mode": "Markdown",
                     "appendAttribution": false
                 }
+            }
+        },
+        {
+            "id": "aggregate-briefing-data",
+            "name": "Aggregate Briefing Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2760,
+                500
+            ],
+            "parameters": {
+                "jsCode": "const items = $input.all().filter(i => i.json.symbol);\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data,\n  global_cues: i.json.global_cues,\n  fii_dii: i.json.fii_dii\n}));\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: items.length > 0 ? items[0].json.global_cues : null,\n    fii_dii: items.length > 0 ? items[0].json.fii_dii : null\n  }\n}];"
+            }
+        },
+        {
+            "id": "fetch-analyze-holding",
+            "name": "Fetch Analyze Holding",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                2060,
+                -300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            },
+            "alwaysOutputData": true,
+            "onError": "continueRegularOutput",
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT symbol, net_quantity, avg_buy_price, total_invested FROM holdings WHERE user_id = $1 AND symbol = $2 LIMIT 1",
+                "options": {
+                    "queryReplacement": "={{ [$('Parse Claude Response').item.json.user_id, $('Parse Claude Response').item.json.symbol] }}"
+                }
+            }
+        },
+        {
+            "id": "typing-analyze",
+            "name": "Typing Analyze",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2060,
+                -500
+            ],
+            "onError": "continueRegularOutput",
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            }
+        },
+        {
+            "id": "typing-briefing",
+            "name": "Typing Briefing",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2460,
+                400
+            ],
+            "onError": "continueRegularOutput",
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            }
+        },
+        {
+            "id": "typing-ask",
+            "name": "Typing Ask",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2060,
+                800
+            ],
+            "onError": "continueRegularOutput",
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            }
+        },
+        {
+            "id": "typing-sync",
+            "name": "Typing Sync",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2060,
+                200
+            ],
+            "onError": "continueRegularOutput",
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
             }
         }
     ],
@@ -1927,14 +2056,14 @@
                 ],
                 [
                     {
-                        "node": "Get Analyze Token",
+                        "node": "Typing Analyze",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Handle BRIEFING",
+                        "node": "Typing Briefing",
                         "type": "main",
                         "index": 0
                     }
@@ -1962,7 +2091,7 @@
                 ],
                 [
                     {
-                        "node": "Get Sync Token",
+                        "node": "Typing Sync",
                         "type": "main",
                         "index": 0
                     }
@@ -1976,7 +2105,7 @@
                 ],
                 [
                     {
-                        "node": "Fetch Ask Context",
+                        "node": "Typing Ask",
                         "type": "main",
                         "index": 0
                     }
@@ -2116,6 +2245,11 @@
                 [
                     {
                         "node": "Fetch Analyze Data",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Fetch Analyze Holding",
                         "type": "main",
                         "index": 0
                     }
@@ -2309,7 +2443,7 @@
             "main": [
                 [
                     {
-                        "node": "Claude: On-Demand Briefing",
+                        "node": "Aggregate Briefing Data",
                         "type": "main",
                         "index": 0
                     }
@@ -2424,6 +2558,61 @@
                     }
                 ]
             ]
+        },
+        "Aggregate Briefing Data": {
+            "main": [
+                [
+                    {
+                        "node": "Claude: On-Demand Briefing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Analyze": {
+            "main": [
+                [
+                    {
+                        "node": "Get Analyze Token",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Briefing": {
+            "main": [
+                [
+                    {
+                        "node": "Handle BRIEFING",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Sync": {
+            "main": [
+                [
+                    {
+                        "node": "Get Sync Token",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Ask": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Ask Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
     },
     "settings": {
@@ -2434,9 +2623,9 @@
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
-    "activeVersionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
-    "versionCounter": 132,
+    "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+    "activeVersionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
+    "versionCounter": 137,
     "triggerCount": 1,
     "shared": [
         {
@@ -2459,9 +2648,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-19T03:44:35.445Z",
-        "createdAt": "2026-02-19T03:44:35.445Z",
-        "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
+        "updatedAt": "2026-02-19T04:25:27.574Z",
+        "createdAt": "2026-02-19T04:25:27.574Z",
+        "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
         "workflowId": "kGn3KwIfHldiwuGW",
         "nodes": [
             {
@@ -2996,7 +3185,8 @@
                     "text": "={{ '\u2705 *BUY Logged*\\n\\n' + '\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + '   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n' + '   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n' + '   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price).toLocaleString() + '\\n\\n' + '\ud83d\udca1 Set a price alert: `alert ' + $('Parse Claude Response').item.json.symbol + ' LOWER-UPPER`' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"Analyze\", callback_data: \"predict_\" + $(\"Parse Claude Response\").item.json.symbol}, {text: \"Set Alert\", callback_data: \"alert_prompt_\" + $(\"Parse Claude Response\").item.json.symbol}], [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Briefing\", callback_data: \"briefing\"}]]}) }}"
                     }
                 },
                 "id": "confirm-buy",
@@ -3104,7 +3294,8 @@
                     "text": "={{ $json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}, {\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}], [{\"text\": \"Sync Kite\", \"callback_data\": \"sync\"}, {\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                     }
                 },
                 "id": "send-portfolio",
@@ -3128,7 +3319,8 @@
                     "text": "\ud83e\udd16 *StockPulse Commands*\n\n\ud83d\udcc8 *Trading*\n`buy RELIANCE 10 at 2850`\n`sell INFY 5 at 1500`\n\n\ud83d\udd14 *Alerts*\n`alert RELIANCE 2800-2950`\n`alerts` \u2014 view active alerts\n`cancel alert RELIANCE`\n\n\ud83d\udcca *Portfolio*\n`portfolio` \u2014 live holdings + P&L\n`sync` \u2014 sync from Kite (User 1)\n\n\ud83d\udd2e *AI Analysis*\n`analyze RELIANCE` \u2014 deep AI analysis\n`analyze TCS 4000` \u2014 analysis with target\n\n\u2753 *Ask Anything*\n`why did Reliance fall?`\n`top 5 losses in my portfolio`\n`what should I sell?`\n`how is my portfolio doing?`\n\n\ud83c\udf05 *Briefing*\n`briefing` \u2014 morning AI analysis\n\n\ud83d\udcce *File Upload*\nSend a CSV file to bulk import trades\n\n\u2699\ufe0f *Settings*\n`login <token>` \u2014 connect Kite\n`settings` \u2014 view preferences",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}, {\"text\": \"Sync\", \"callback_data\": \"sync\"}]]}"
                     }
                 },
                 "id": "handle-help",
@@ -3152,7 +3344,8 @@
                     "text": "={{ '\ud83e\udd14 I didn\\'t understand that.\\n\\n' + 'You said: \"' + $(\\'Prepare User Context\\').item.json.message_text + '\"\\n\\n' + 'Try:\\n' + '\u2022 `analyze RELIANCE` \u2014 deep AI stock analysis\\n' + '\u2022 `portfolio` \u2014 see holdings with live P&L\\n' + '\u2022 `why did X fall?` \u2014 ask me anything\\n' + '\u2022 `help` \u2014 all commands' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Help\", \"callback_data\": \"help\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}]]}"
                     }
                 },
                 "id": "handle-unknown",
@@ -3267,7 +3460,8 @@
                     "text": "={{ $json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                     }
                 },
                 "id": "send-alerts-list",
@@ -3327,7 +3521,8 @@
                     "text": "={{ $input.all().length > 0 ? '\u2705 Alert for *' + $('Prepare Alert Cancel').first().json.symbol + '* cancelled.' : '\u26a0\ufe0f No active alert found for *' + $('Prepare Alert Cancel').first().json.symbol + '*.' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}]]}"
                     }
                 },
                 "id": "confirm-alert-cancel",
@@ -3365,7 +3560,8 @@
                     "text": "={{ '\u2705 *SELL Logged*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n   Qty: ' + $('Parse Claude Response').item.json.quantity + ' shares\\n   Price: \u20b9' + $('Parse Claude Response').item.json.price + '\\n   Total: \u20b9' + ($('Parse Claude Response').item.json.quantity * $('Parse Claude Response').item.json.price) + '\\n\\n\ud83d\udcc1 View with: `portfolio`' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Analyze\", callback_data: \"predict_\" + $(\"Parse Claude Response\").item.json.symbol}], [{text: \"Briefing\", callback_data: \"briefing\"}]]}) }}"
                     }
                 },
                 "id": "confirm-sell",
@@ -3389,7 +3585,8 @@
                     "text": "={{ '\ud83d\udd14 *Alert Set*\\n\\n\ud83d\udcca ' + $('Parse Claude Response').item.json.symbol + '\\n' + ($('Parse Claude Response').item.json.lower_bound ? '   \u2b07\ufe0f Lower: \u20b9' + $('Parse Claude Response').item.json.lower_bound + '\\n' : '') + ($('Parse Claude Response').item.json.upper_bound ? '   \u2b06\ufe0f Upper: \u20b9' + $('Parse Claude Response').item.json.upper_bound + '\\n' : '') + '\\nView alerts: `alerts`\\nCancel: `cancel alert ' + $('Parse Claude Response').item.json.symbol + '`' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ JSON.stringify({inline_keyboard: [[{text: \"My Alerts\", callback_data: \"alerts\"}, {text: \"Analyze\", callback_data: \"predict_\" + $json.symbol}], [{text: \"Cancel Alert\", callback_data: \"cancel_alert_\" + $json.symbol}, {text: \"Portfolio\", callback_data: \"portfolio\"}]]}) }}"
                     }
                 },
                 "id": "confirm-alert-set",
@@ -3485,7 +3682,8 @@
                     "text": "={{ '\u2705 *Kite Login Successful!*\\n\\nYour Zerodha session is now active.\\nToken valid until: ' + new Date($input.first().json.token_expiry).toLocaleString(\"en-IN\", {timeZone: \"Asia/Kolkata\"}) + ' IST\\n\\nLive data is now enabled. Your morning briefing will include live price data.' }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Sync Portfolio\", \"callback_data\": \"sync\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"Briefing\", \"callback_data\": \"briefing\"}]]}"
                     }
                 },
                 "id": "confirm-login",
@@ -3509,7 +3707,8 @@
                     "text": "\ud83d\udd11 *Kite Connect Login*\n\n1. Click the link below to login:\n[Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2. Complete Zerodha login\n3. From the redirect URL, copy the full URL or just the `request_token` value\n4. Send: `login YOUR_TOKEN`\n\nOr send your existing token directly:\n`login api_key:access_token`",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Help\", \"callback_data\": \"help\"}, {\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}]]}"
                     }
                 },
                 "id": "login-instructions",
@@ -3529,7 +3728,7 @@
             },
             {
                 "parameters": {
-                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't analyze this stock right now. Please try again in a moment.\";\n  } else {\n    answer = \"\u26a0\ufe0f Analysis unavailable. Try again or use a different stock symbol.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't analyze this stock right now. Please try again.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starCount = (sanitized.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n  const underCount = (sanitized.match(/_/g) || []).length;\n  if (underCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('_');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized } }];"
+                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nconst symbol = ctx.symbol || 'UNKNOWN';\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't analyze this stock right now. Please try again in a moment.\";\n  } else {\n    answer = \"\\u26a0\\ufe0f Analysis unavailable. Try again or use a different stock symbol.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't analyze this stock right now. Please try again.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starCount = (sanitized.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Set Alert\", callback_data: \"alert_prompt_\" + symbol}, {text: \"Portfolio\", callback_data: \"portfolio\"}],\n    [{text: \"Briefing\", callback_data: \"briefing\"}, {text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized, symbol: symbol, reply_markup: JSON.stringify(buttons) } }];"
                 },
                 "id": "format-predict",
                 "name": "Format Analysis",
@@ -3546,7 +3745,8 @@
                     "text": "={{ $json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ $json.reply_markup }}"
                     }
                 },
                 "id": "send-predict",
@@ -3573,7 +3773,7 @@
                         "parameters": [
                             {
                                 "name": "Authorization",
-                                "value": "={ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }"
+                                "value": "={{ 'token gifzm9kfars6kr8x:' + $('Get Analyze Token').first().json.access_token_encrypted }}"
                             },
                             {
                                 "name": "X-Kite-Version",
@@ -3659,7 +3859,8 @@
                     "text": "\u26a0\ufe0f *Kite Session Required*\n\nYour Kite token has expired or is not set.\n\nTo sync your portfolio:\n1. Get a fresh access token from Kite\n2. Send: `login api_key:access_token`\n\nThen try `sync` again.",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Login\", \"callback_data\": \"login\"}, {\"text\": \"Help\", \"callback_data\": \"help\"}]]}"
                     }
                 },
                 "credentials": {
@@ -3695,10 +3896,12 @@
                             "response": {
                                 "responseFormat": "json"
                             }
-                        }
+                        },
+                        "neverError": true
                     },
                     "onError": "continueRegularOutput"
-                }
+                },
+                "onError": "continueRegularOutput"
             },
             {
                 "id": "sync-build-sql",
@@ -3710,7 +3913,7 @@
                     980
                 ],
                 "parameters": {
-                    "jsCode": "const userId = $(\"Parse Claude Response\").item.json.user_id;\nconst response = $(\"Fetch Kite Holdings\").item.json;\nconst holdings = response.data || [];\n\nif (holdings.length === 0) {\n  return [{ json: {\n    sql: 'SELECT 1 AS synced_count',\n    count: 0,\n    sample: 'No holdings returned from Kite'\n  }}];\n}\n\nconst values = holdings.map(h => {\n  const sym = h.tradingsymbol.replace(/'/g, \"''\");\n  const qty = parseInt(h.quantity);\n  const price = parseFloat(h.average_price).toFixed(2);\n  return `(${userId}, '${sym}', 'BUY', ${qty}, ${price}, 'kite_sync', CURRENT_DATE)`;\n}).join(',\\n');\n\nconst sql = `DELETE FROM trades WHERE user_id=${userId} AND source='kite_sync';\\nINSERT INTO trades (user_id, symbol, trade_type, quantity, price, source, trade_date) VALUES\\n${values};`;\n\nconst sample = holdings.slice(0, 3).map(h =>\n  `${h.tradingsymbol} (${h.quantity}@\\u20b9${parseFloat(h.average_price).toFixed(0)})`\n).join(', ');\n\nreturn [{ json: { sql, count: holdings.length, sample } }];"
+                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nconst kiteResponse = $input.first().json;\n\nif (kiteResponse.error_type || kiteResponse.status === 'error' || !kiteResponse.data) {\n  const errorMsg = kiteResponse.message || kiteResponse.error_type || 'Kite API error';\n  return [{ json: {\n    sql: null, error: true, chat_id: ctx.chat_id, user_id: ctx.user_id, count: 0,\n    message: '\\u26a0\\ufe0f *Kite Sync Failed*\\n\\nError: ' + errorMsg + '\\n\\nYour Kite session may have expired. Please login again:\\n`login`'\n  }}];\n}\n\nconst holdings = kiteResponse.data || [];\nif (holdings.length === 0) {\n  return [{ json: { sql: 'SELECT 1', error: false, chat_id: ctx.chat_id, user_id: ctx.user_id, count: 0, message: 'No holdings found in your Kite account.' }}];\n}\n\nlet sql = 'DELETE FROM trades WHERE user_id = ' + ctx.user_id + \" AND source = 'kite_sync';\\n\";\nconst values = holdings.map(h => {\n  const symbol = h.tradingsymbol.replace(/'/g, \"''\");\n  const qty = parseInt(h.quantity) || 0;\n  const price = parseFloat(h.average_price) || 0;\n  return '(' + ctx.user_id + \", '\" + symbol + \"', 'BUY', \" + qty + ', ' + price + \", 'kite_sync', CURRENT_DATE)\";\n});\nsql += 'INSERT INTO trades (user_id, symbol, trade_type, quantity, price, source, trade_date) VALUES\\n' + values.join(',\\n') + ';';\n\nreturn [{ json: { sql: sql, error: false, chat_id: ctx.chat_id, user_id: ctx.user_id, count: holdings.length,\n  message: '\\u2705 *Portfolio Synced!*\\n\\nImported *' + holdings.length + '* holdings from Zerodha Kite.\\nUse `portfolio` to see your updated holdings.'\n}}];"
                 }
             },
             {
@@ -3731,7 +3934,9 @@
                         "id": "6dSdIQ2xAFPzyEwe",
                         "name": "Postgres account"
                     }
-                }
+                },
+                "onError": "continueRegularOutput",
+                "alwaysOutputData": true
             },
             {
                 "id": "sync-format-result",
@@ -3743,7 +3948,7 @@
                     1200
                 ],
                 "parameters": {
-                    "jsCode": "const count = $(\"Build Sync SQL\").item.json.count;\nconst sample = $(\"Build Sync SQL\").item.json.sample;\nconst chatId = $(\"Parse Claude Response\").item.json.chat_id;\n\nreturn [{ json: {\n  chat_id: chatId,\n  message: `\\u2705 *Portfolio Synced!*\\n\\nImported *${count} holdings* from Kite Connect.\\n\\nSample: ${sample}...\\n\\nSend \\`portfolio\\` to view your holdings.`\n}}];"
+                    "jsCode": "const prev = $('Build Sync SQL').first().json;\nreturn [{ json: { chat_id: prev.chat_id, message: prev.message, count: prev.count }}];"
                 }
             },
             {
@@ -3760,7 +3965,8 @@
                     "text": "={{ $json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"Portfolio\", \"callback_data\": \"portfolio\"}, {\"text\": \"Briefing\", \"callback_data\": \"briefing\"}], [{\"text\": \"My Alerts\", \"callback_data\": \"alerts\"}]]}"
                     }
                 },
                 "credentials": {
@@ -3808,7 +4014,7 @@
                         "parameters": [
                             {
                                 "name": "Authorization",
-                                "value": "={ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }"
+                                "value": "={{ 'token gifzm9kfars6kr8x:' + $input.first().json.access_token_encrypted }}"
                             },
                             {
                                 "name": "X-Kite-Version",
@@ -3879,7 +4085,7 @@
                     },
                     "sendBody": true,
                     "specifyBody": "json",
-                    "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-20250514',\n  max_tokens: 2000,\n  system: 'You are StockPulse, an expert Indian stock market analyst specializing in NSE/BSE equities. Provide detailed, actionable analysis personalized to the user\\'s position. Use Rs. for prices. Format for Telegram with *bold* for emphasis. Keep under 700 words.\\n\\nAlways include:\\n1. CLEAR SIGNAL - State one of: *STRONG BUY* / *BUY* / *HOLD* / *SELL* / *STRONG SELL* with a 1-line reason. Put this FIRST.\\n2. TECHNICAL SNAPSHOT - Trend direction, RSI zone (overbought/oversold/neutral), MACD signal, key support & resistance levels with prices\\n3. NEWS & SENTIMENT - Any recent developments, earnings, or sentiment shifts from available data\\n4. PRICE TARGETS - Upside target, downside risk, and stop-loss level\\n5. ACTIONABLE ADVICE - Specific action: \\\"Add more if it dips below Rs.X\\\" or \\\"Book partial profits above Rs.Y\\\" or \\\"Hold with stop-loss at Rs.Z\\\"\\n\\nBe specific with numbers. Every recommendation must have a price level.',\n  messages: [{\n    role: 'user',\n    content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\nLive Quote: ' + JSON.stringify($('Fetch Kite Quote').item.json) + '\\n\\nStaged Data (last 7 days): ' + JSON.stringify($input.all().map(function(i){ return { type: i.json.data_type, data: i.json.data }; })) + '\\n\\nUser target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none')\n  }]\n}) }}"
+                    "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2000,  system: 'You are StockPulse, an expert Indian stock market analyst specializing in NSE/BSE equities. Provide detailed, actionable analysis personalized to the user\\'s position. Use Rs. for prices. Format for Telegram with *bold* for emphasis. Keep under 700 words.\\n\\nAlways include:\\n1. CLEAR SIGNAL - State one of: *STRONG BUY* / *BUY* / *HOLD* / *SELL* / *STRONG SELL* with a 1-line reason. Put this FIRST.\\n2. POSITION SUMMARY - If user holds this stock, state: quantity held, avg buy price, current price, unrealized P&L in Rs. and %\\n3. TECHNICAL SNAPSHOT - Trend direction, RSI zone, MACD signal, key support & resistance levels with prices\\n4. NEWS & SENTIMENT - Recent developments from available data\\n5. PRICE TARGETS - Upside target, downside risk, stop-loss level\\n6. ACTIONABLE ADVICE - Specific action with price levels\\n\\nIf user does NOT hold this stock, focus on whether it is a good entry point and at what price.\\nBe specific with numbers. Every recommendation must have a price level.',  messages: [{    role: 'user',    content: 'Analyze ' + $('Parse Claude Response').item.json.symbol + ' for me.\\n\\nLive Quote: ' + JSON.stringify($('Fetch Kite Quote').item.json) + '\\n\\nStaged Data (last 7 days): ' + JSON.stringify($input.all().map(function(i){ return { type: i.json.data_type, data: i.json.data }; })) + '\\n\\nMy position: ' + (function(){ try { var items = $('Fetch Analyze Holding').all(); if(items.length > 0 && items[0].json.symbol) { return JSON.stringify({symbol: items[0].json.symbol, qty: items[0].json.net_quantity, avg_price: items[0].json.avg_buy_price, invested: items[0].json.total_invested}); } return 'Not held'; } catch(e) { return 'Not held'; } })() + '\\n\\nUser target: ' + ($('Parse Claude Response').item.json.upper_bound || 'none')  }]}) }}"
                 },
                 "credentials": {
                     "httpHeaderAuth": {
@@ -3962,7 +4168,7 @@
                     580
                 ],
                 "parameters": {
-                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't process that question right now. Please try again in a moment.\";\n  } else {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  // Remove code block language hints that Telegram doesn't support\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  // Fix unmatched bold markers\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    // Find last * and escape it\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n  // Fix unmatched italic markers\n  const underPairs = (sanitized.match(/_/g) || []).length;\n  if (underPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('_');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized } }];"
+                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else if (resp.error) {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question right now. Please try again in a moment.\";\n  } else {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't process that question. Try rephrasing or use /help for commands.\";\n}\n\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"Briefing\", callback_data: \"briefing\"}],\n    [{text: \"My Alerts\", callback_data: \"alerts\"}, {text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\nreturn [{ json: { chat_id: ctx.chat_id, message: sanitized, reply_markup: JSON.stringify(buttons) } }];"
                 }
             },
             {
@@ -3979,7 +4185,8 @@
                     "text": "={{ $('Format Ask Response').item.json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ $json.reply_markup || '' }}"
                     }
                 },
                 "credentials": {
@@ -4021,7 +4228,7 @@
                 "type": "n8n-nodes-base.httpRequest",
                 "typeVersion": 4.2,
                 "position": [
-                    2860,
+                    2960,
                     500
                 ],
                 "credentials": {
@@ -4051,7 +4258,7 @@
                     },
                     "sendBody": true,
                     "specifyBody": "json",
-                    "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-20250514',\n  max_tokens: 2500,\n  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, estimated current value (if data available), top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Current status from available data\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch today\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns about holdings\\n\\nBe specific with numbers. Use Rs. for prices. Use emojis sparingly. End with disclaimer: Technical analysis only, not financial advice.',\n  messages: [{\n    role: 'user',\n    content: 'Generate my market briefing.\\n\\nMy holdings:\\n' + JSON.stringify($input.all().filter(function(i){ return i.json.symbol; }).map(function(i){ return { symbol: i.json.symbol, qty: i.json.net_quantity, avg_price: i.json.avg_buy_price, invested: i.json.total_invested, market_data: i.json.latest_data, global_cues: i.json.global_cues, fii_dii: i.json.fii_dii }; })) + '\\n\\nProvide a comprehensive briefing with actionable signals for each stock.'\n  }]\n}) }}"
+                    "jsonBody": "={{ JSON.stringify({  model: 'claude-sonnet-4-20250514',  max_tokens: 2500,  system: 'You are StockPulse, an expert Indian stock market analyst. Generate a personalized market briefing in Telegram markdown format (use * for bold). Keep it 500-700 words.\\n\\nStructure:\\n1. MARKET PULSE (3-4 lines): Global overnight summary + FII/DII signal + expected market direction\\n2. YOUR PORTFOLIO SNAPSHOT: Total invested, top/bottom performers\\n3. STOCK-BY-STOCK (for each holding):\\n   - Signal: *BUY MORE* / *HOLD* / *PARTIAL EXIT* / *EXIT* with 1-line reason\\n   - Key price level to watch\\n4. TOP 3 ACTIONS FOR TODAY: Specific actionable triggers with price levels\\n5. RISK FLAGS: Any concerns\\n\\nBe specific with numbers. Use Rs. for prices. End with disclaimer: Technical analysis only, not financial advice.',  messages: [{    role: 'user',    content: 'Generate my market briefing.\\n\\nMy holdings: ' + JSON.stringify($json.holdings) + '\\n\\nGlobal cues: ' + JSON.stringify($json.global_cues) + '\\n\\nFII/DII: ' + JSON.stringify($json.fii_dii)  }]}) }}"
                 }
             },
             {
@@ -4060,11 +4267,11 @@
                 "type": "n8n-nodes-base.code",
                 "typeVersion": 2,
                 "position": [
-                    3060,
+                    3160,
                     500
                 ],
                 "parameters": {
-                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else {\n    answer = \"\u26a0\ufe0f Sorry, I couldn't generate your briefing right now. The scheduled briefing will arrive at 8:30 AM IST on the next trading day.\";\n  }\n} catch(e) {\n  answer = \"\u26a0\ufe0f Sorry, I couldn't generate your briefing right now. The scheduled briefing will arrive at 8:30 AM IST on the next trading day.\";\n}\n\n// Sanitize markdown for Telegram\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\n// Split long messages for Telegram (4096 char limit)\nconst MAX_LEN = 4000;\nif (sanitized.length <= MAX_LEN) {\n  return [{ json: { chat_id: ctx.chat_id, message: sanitized } }];\n}\n\n// Split at paragraph breaks\nconst parts = [];\nlet current = '';\nconst paragraphs = sanitized.split('\\n\\n');\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > MAX_LEN && current) {\n    parts.push(current.trim());\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current.trim()) parts.push(current.trim());\n\nreturn parts.map(p => ({ json: { chat_id: ctx.chat_id, message: p } }));"
+                    "jsCode": "const ctx = $('Parse Claude Response').item.json;\nlet answer = '';\ntry {\n  const resp = $input.first().json;\n  if (resp.content && resp.content[0]) {\n    answer = resp.content[0].text;\n  } else {\n    answer = \"\\u26a0\\ufe0f Sorry, I couldn't generate your briefing right now. Please try again.\";\n  }\n} catch(e) {\n  answer = \"\\u26a0\\ufe0f Sorry, I couldn't generate your briefing right now. Please try again.\";\n}\n\nlet sanitized = answer;\ntry {\n  sanitized = sanitized.replace(/```\\w+/g, '```');\n  const starPairs = (sanitized.match(/\\*/g) || []).length;\n  if (starPairs % 2 !== 0) {\n    const lastIdx = sanitized.lastIndexOf('*');\n    sanitized = sanitized.substring(0, lastIdx) + sanitized.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  sanitized = answer.replace(/[*_`\\[\\]]/g, '');\n}\n\nconst buttons = {\n  inline_keyboard: [\n    [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"My Alerts\", callback_data: \"alerts\"}],\n    [{text: \"Help\", callback_data: \"help\"}]\n  ]\n};\n\n// Split long messages for Telegram (4096 char limit)\nconst MAX_LEN = 4000;\nif (sanitized.length <= MAX_LEN) {\n  return [{ json: { chat_id: ctx.chat_id, message: sanitized, reply_markup: JSON.stringify(buttons) } }];\n}\n\nconst parts = [];\nlet current = '';\nconst paragraphs = sanitized.split('\\n\\n');\nfor (const p of paragraphs) {\n  if ((current + '\\n\\n' + p).length > MAX_LEN && current) {\n    parts.push(current.trim());\n    current = p;\n  } else {\n    current = current ? current + '\\n\\n' + p : p;\n  }\n}\nif (current.trim()) parts.push(current.trim());\n\nreturn parts.map((p, i) => ({\n  json: {\n    chat_id: ctx.chat_id,\n    message: p,\n    reply_markup: i === parts.length - 1 ? JSON.stringify(buttons) : ''\n  }\n}));"
                 }
             },
             {
@@ -4073,7 +4280,7 @@
                 "type": "n8n-nodes-base.telegram",
                 "typeVersion": 1.2,
                 "position": [
-                    3260,
+                    3360,
                     500
                 ],
                 "credentials": {
@@ -4088,7 +4295,8 @@
                     "text": "={{ $json.message }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ $json.reply_markup || '' }}"
                     }
                 }
             },
@@ -4235,6 +4443,116 @@
                         "parse_mode": "Markdown",
                         "appendAttribution": false
                     }
+                }
+            },
+            {
+                "id": "aggregate-briefing-data",
+                "name": "Aggregate Briefing Data",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2760,
+                    500
+                ],
+                "parameters": {
+                    "jsCode": "const items = $input.all().filter(i => i.json.symbol);\nconst holdings = items.map(i => ({\n  symbol: i.json.symbol,\n  qty: i.json.net_quantity,\n  avg_price: i.json.avg_buy_price,\n  invested: i.json.total_invested,\n  market_data: i.json.latest_data,\n  global_cues: i.json.global_cues,\n  fii_dii: i.json.fii_dii\n}));\n\nreturn [{\n  json: {\n    holdings: holdings,\n    global_cues: items.length > 0 ? items[0].json.global_cues : null,\n    fii_dii: items.length > 0 ? items[0].json.fii_dii : null\n  }\n}];"
+                }
+            },
+            {
+                "id": "fetch-analyze-holding",
+                "name": "Fetch Analyze Holding",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    2060,
+                    -300
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                },
+                "alwaysOutputData": true,
+                "onError": "continueRegularOutput",
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT symbol, net_quantity, avg_buy_price, total_invested FROM holdings WHERE user_id = $1 AND symbol = $2 LIMIT 1",
+                    "options": {
+                        "queryReplacement": "={{ [$('Parse Claude Response').item.json.user_id, $('Parse Claude Response').item.json.symbol] }}"
+                    }
+                }
+            },
+            {
+                "id": "typing-analyze",
+                "name": "Typing Analyze",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2060,
+                    -500
+                ],
+                "onError": "continueRegularOutput",
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                }
+            },
+            {
+                "id": "typing-briefing",
+                "name": "Typing Briefing",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2460,
+                    400
+                ],
+                "onError": "continueRegularOutput",
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                }
+            },
+            {
+                "id": "typing-ask",
+                "name": "Typing Ask",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2060,
+                    800
+                ],
+                "onError": "continueRegularOutput",
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                }
+            },
+            {
+                "id": "typing-sync",
+                "name": "Typing Sync",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2060,
+                    200
+                ],
+                "onError": "continueRegularOutput",
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
                 }
             }
         ],
@@ -4384,14 +4702,14 @@
                     ],
                     [
                         {
-                            "node": "Get Analyze Token",
+                            "node": "Typing Analyze",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Handle BRIEFING",
+                            "node": "Typing Briefing",
                             "type": "main",
                             "index": 0
                         }
@@ -4419,7 +4737,7 @@
                     ],
                     [
                         {
-                            "node": "Get Sync Token",
+                            "node": "Typing Sync",
                             "type": "main",
                             "index": 0
                         }
@@ -4433,7 +4751,7 @@
                     ],
                     [
                         {
-                            "node": "Fetch Ask Context",
+                            "node": "Typing Ask",
                             "type": "main",
                             "index": 0
                         }
@@ -4573,6 +4891,11 @@
                     [
                         {
                             "node": "Fetch Analyze Data",
+                            "type": "main",
+                            "index": 0
+                        },
+                        {
+                            "node": "Fetch Analyze Holding",
                             "type": "main",
                             "index": 0
                         }
@@ -4766,7 +5089,7 @@
                 "main": [
                     [
                         {
-                            "node": "Claude: On-Demand Briefing",
+                            "node": "Aggregate Briefing Data",
                             "type": "main",
                             "index": 0
                         }
@@ -4881,6 +5204,61 @@
                         }
                     ]
                 ]
+            },
+            "Aggregate Briefing Data": {
+                "main": [
+                    [
+                        {
+                            "node": "Claude: On-Demand Briefing",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Analyze": {
+                "main": [
+                    [
+                        {
+                            "node": "Get Analyze Token",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Briefing": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle BRIEFING",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Sync": {
+                "main": [
+                    [
+                        {
+                            "node": "Get Sync Token",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Ask": {
+                "main": [
+                    [
+                        {
+                            "node": "Fetch Ask Context",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
             }
         },
         "authors": "Vipindas S",
@@ -4889,34 +5267,34 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-19T03:44:36.380Z",
-                "id": 178,
+                "createdAt": "2026-02-19T04:25:28.535Z",
+                "id": 182,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
+                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:44:37.744Z",
-                "id": 179,
+                "createdAt": "2026-02-19T04:25:29.872Z",
+                "id": 183,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
+                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:44:40.607Z",
-                "id": 180,
+                "createdAt": "2026-02-19T04:25:33.115Z",
+                "id": 184,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
+                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:44:41.896Z",
-                "id": 181,
+                "createdAt": "2026-02-19T04:25:34.433Z",
+                "id": 185,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "c5f38b51-0220-4911-b5c2-d2455adcbde1",
+                "versionId": "f0fa82ab-7570-4ce5-aaba-c4ee9e401449",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }

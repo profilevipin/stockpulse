@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-19T03:35:12.843Z",
+    "updatedAt": "2026-02-19T04:44:53.460Z",
     "createdAt": "2026-02-17T17:48:41.845Z",
     "id": "NYoURGSYiDNdpP3Q",
     "name": "WF4 - Morning Briefing Synthesis",
@@ -45,7 +45,9 @@
                     "id": "6dSdIQ2xAFPzyEwe",
                     "name": "Postgres account"
                 }
-            }
+            },
+            "alwaysOutputData": true,
+            "onError": "continueRegularOutput"
         },
         {
             "parameters": {
@@ -65,7 +67,9 @@
                     "id": "6dSdIQ2xAFPzyEwe",
                     "name": "Postgres account"
                 }
-            }
+            },
+            "alwaysOutputData": true,
+            "onError": "continueRegularOutput"
         },
         {
             "parameters": {
@@ -85,7 +89,9 @@
                     "id": "6dSdIQ2xAFPzyEwe",
                     "name": "Postgres account"
                 }
-            }
+            },
+            "alwaysOutputData": true,
+            "onError": "continueRegularOutput"
         },
         {
             "parameters": {
@@ -136,11 +142,12 @@
                     "id": "Idkjo6pmv2QE4urQ",
                     "name": "Anthropic Header Auth"
                 }
-            }
+            },
+            "onError": "continueRegularOutput"
         },
         {
             "parameters": {
-                "jsCode": "// Extract briefing text from Claude response\nconst response = $input.first().json;\nconst briefing = response.content\n  .filter(c => c.type === 'text')\n  .map(c => c.text)\n  .join('');\n\n// Telegram max message is 4096 chars \u2014 split if needed\nconst chatId = $('Assemble Per-User Context').item.json.chat_id;\nconst messages = [];\n\nif (briefing.length <= 4096) {\n  messages.push({ chat_id: chatId, text: briefing });\n} else {\n  // Split at paragraph boundaries\n  const parts = briefing.match(/[\\s\\S]{1,4000}(?=\\n|$)/g) || [briefing];\n  for (const part of parts) {\n    messages.push({ chat_id: chatId, text: part.trim() });\n  }\n}\n\nreturn messages.map(m => ({ json: m }));"
+                "jsCode": "// Handle errors from Claude API\nconst resp = $input.first().json;\nlet text = '';\ntry {\n  if (resp.content && resp.content[0]) {\n    text = resp.content[0].text;\n  } else {\n    text = 'Morning briefing generation failed. Your portfolio data is being monitored and alerts are active.';\n  }\n} catch(e) {\n  text = 'Morning briefing generation failed. Your portfolio data is being monitored and alerts are active.';\n}\n\n// Sanitize Telegram markdown\ntry {\n  text = text.replace(/```\\w+/g, '```');\n  const starCount = (text.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = text.lastIndexOf('*');\n    text = text.substring(0, lastIdx) + text.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  text = text.replace(/[*_`\\[\\]]/g, '');\n}\n\n// Get user info from Assemble context\nconst ctx = $('Assemble Per-User Context').first().json;\nreturn [{\n  json: {\n    chat_id: ctx.chat_id || ctx.private_chat_id,\n    message: text,\n    reply_markup: JSON.stringify({\n      inline_keyboard: [\n        [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"My Alerts\", callback_data: \"alerts\"}],\n        [{text: \"Help\", callback_data: \"help\"}]\n      ]\n    })\n  }\n}];"
             },
             "id": "format-briefing",
             "name": "Format Briefing",
@@ -157,7 +164,8 @@
                 "text": "={{ $json.text }}",
                 "additionalFields": {
                     "parse_mode": "Markdown",
-                    "appendAttribution": false
+                    "appendAttribution": false,
+                    "reply_markup": "={{ $json.reply_markup || '' }}"
                 }
             },
             "id": "send-briefing",
@@ -184,16 +192,6 @@
                         "node": "Read All Staging Data",
                         "type": "main",
                         "index": 0
-                    },
-                    {
-                        "node": "Get Users & Holdings",
-                        "type": "main",
-                        "index": 0
-                    },
-                    {
-                        "node": "Get Active Alerts",
-                        "type": "main",
-                        "index": 0
                     }
                 ]
             ]
@@ -202,7 +200,7 @@
             "main": [
                 [
                     {
-                        "node": "Assemble Per-User Context",
+                        "node": "Get Users & Holdings",
                         "type": "main",
                         "index": 0
                     }
@@ -213,7 +211,7 @@
             "main": [
                 [
                     {
-                        "node": "Assemble Per-User Context",
+                        "node": "Get Active Alerts",
                         "type": "main",
                         "index": 0
                     }
@@ -266,7 +264,7 @@
         }
     },
     "settings": {
-        "executionOrder": "v0",
+        "executionOrder": "v1",
         "callerPolicy": "workflowsFromSameOwner",
         "availableInMCP": false
     },
@@ -277,9 +275,9 @@
     },
     "meta": null,
     "pinData": null,
-    "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
-    "activeVersionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
-    "versionCounter": 22,
+    "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
+    "activeVersionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
+    "versionCounter": 27,
     "triggerCount": 1,
     "shared": [
         {
@@ -302,9 +300,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-18T13:55:43.398Z",
-        "createdAt": "2026-02-18T13:55:43.398Z",
-        "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+        "updatedAt": "2026-02-19T04:44:53.462Z",
+        "createdAt": "2026-02-19T04:44:53.462Z",
+        "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
         "workflowId": "NYoURGSYiDNdpP3Q",
         "nodes": [
             {
@@ -345,7 +343,9 @@
                         "id": "6dSdIQ2xAFPzyEwe",
                         "name": "Postgres account"
                     }
-                }
+                },
+                "alwaysOutputData": true,
+                "onError": "continueRegularOutput"
             },
             {
                 "parameters": {
@@ -365,7 +365,9 @@
                         "id": "6dSdIQ2xAFPzyEwe",
                         "name": "Postgres account"
                     }
-                }
+                },
+                "alwaysOutputData": true,
+                "onError": "continueRegularOutput"
             },
             {
                 "parameters": {
@@ -385,7 +387,9 @@
                         "id": "6dSdIQ2xAFPzyEwe",
                         "name": "Postgres account"
                     }
-                }
+                },
+                "alwaysOutputData": true,
+                "onError": "continueRegularOutput"
             },
             {
                 "parameters": {
@@ -436,11 +440,12 @@
                         "id": "Idkjo6pmv2QE4urQ",
                         "name": "Anthropic Header Auth"
                     }
-                }
+                },
+                "onError": "continueRegularOutput"
             },
             {
                 "parameters": {
-                    "jsCode": "// Extract briefing text from Claude response\nconst response = $input.first().json;\nconst briefing = response.content\n  .filter(c => c.type === 'text')\n  .map(c => c.text)\n  .join('');\n\n// Telegram max message is 4096 chars \u2014 split if needed\nconst chatId = $('Assemble Per-User Context').item.json.chat_id;\nconst messages = [];\n\nif (briefing.length <= 4096) {\n  messages.push({ chat_id: chatId, text: briefing });\n} else {\n  // Split at paragraph boundaries\n  const parts = briefing.match(/[\\s\\S]{1,4000}(?=\\n|$)/g) || [briefing];\n  for (const part of parts) {\n    messages.push({ chat_id: chatId, text: part.trim() });\n  }\n}\n\nreturn messages.map(m => ({ json: m }));"
+                    "jsCode": "// Handle errors from Claude API\nconst resp = $input.first().json;\nlet text = '';\ntry {\n  if (resp.content && resp.content[0]) {\n    text = resp.content[0].text;\n  } else {\n    text = 'Morning briefing generation failed. Your portfolio data is being monitored and alerts are active.';\n  }\n} catch(e) {\n  text = 'Morning briefing generation failed. Your portfolio data is being monitored and alerts are active.';\n}\n\n// Sanitize Telegram markdown\ntry {\n  text = text.replace(/```\\w+/g, '```');\n  const starCount = (text.match(/\\*/g) || []).length;\n  if (starCount % 2 !== 0) {\n    const lastIdx = text.lastIndexOf('*');\n    text = text.substring(0, lastIdx) + text.substring(lastIdx + 1);\n  }\n} catch(e2) {\n  text = text.replace(/[*_`\\[\\]]/g, '');\n}\n\n// Get user info from Assemble context\nconst ctx = $('Assemble Per-User Context').first().json;\nreturn [{\n  json: {\n    chat_id: ctx.chat_id || ctx.private_chat_id,\n    message: text,\n    reply_markup: JSON.stringify({\n      inline_keyboard: [\n        [{text: \"Portfolio\", callback_data: \"portfolio\"}, {text: \"My Alerts\", callback_data: \"alerts\"}],\n        [{text: \"Help\", callback_data: \"help\"}]\n      ]\n    })\n  }\n}];"
                 },
                 "id": "format-briefing",
                 "name": "Format Briefing",
@@ -457,7 +462,8 @@
                     "text": "={{ $json.text }}",
                     "additionalFields": {
                         "parse_mode": "Markdown",
-                        "appendAttribution": false
+                        "appendAttribution": false,
+                        "reply_markup": "={{ $json.reply_markup || '' }}"
                     }
                 },
                 "id": "send-briefing",
@@ -484,16 +490,6 @@
                             "node": "Read All Staging Data",
                             "type": "main",
                             "index": 0
-                        },
-                        {
-                            "node": "Get Users & Holdings",
-                            "type": "main",
-                            "index": 0
-                        },
-                        {
-                            "node": "Get Active Alerts",
-                            "type": "main",
-                            "index": 0
                         }
                     ]
                 ]
@@ -502,7 +498,7 @@
                 "main": [
                     [
                         {
-                            "node": "Assemble Per-User Context",
+                            "node": "Get Users & Holdings",
                             "type": "main",
                             "index": 0
                         }
@@ -513,7 +509,7 @@
                 "main": [
                     [
                         {
-                            "node": "Assemble Per-User Context",
+                            "node": "Get Active Alerts",
                             "type": "main",
                             "index": 0
                         }
@@ -571,34 +567,34 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-19T03:35:12.956Z",
-                "id": 166,
+                "createdAt": "2026-02-19T04:44:53.604Z",
+                "id": 191,
                 "workflowId": "NYoURGSYiDNdpP3Q",
-                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:35:13.027Z",
-                "id": 167,
+                "createdAt": "2026-02-19T04:44:53.674Z",
+                "id": 192,
                 "workflowId": "NYoURGSYiDNdpP3Q",
-                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:35:14.524Z",
-                "id": 168,
+                "createdAt": "2026-02-19T04:44:54.644Z",
+                "id": 193,
                 "workflowId": "NYoURGSYiDNdpP3Q",
-                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T03:35:14.590Z",
-                "id": 169,
+                "createdAt": "2026-02-19T04:44:54.690Z",
+                "id": 194,
                 "workflowId": "NYoURGSYiDNdpP3Q",
-                "versionId": "3d913e6a-7a41-40a1-9d0e-754cab83caf2",
+                "versionId": "3730fccd-fc0a-458c-8d1d-db711e440b4c",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }
