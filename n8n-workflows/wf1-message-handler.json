@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-19T06:42:32.626Z",
+    "updatedAt": "2026-02-20T02:31:04.348Z",
     "createdAt": "2026-02-18T07:36:36.580Z",
     "id": "kGn3KwIfHldiwuGW",
     "name": "WF1 \u2014 Message Handler",
@@ -186,7 +186,7 @@
                 },
                 "sendBody": true,
                 "specifyBody": "json",
-                "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
+                "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|status|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.\\nFor \\\"status\\\"/\\\"system status\\\"/\\\"kite status\\\"/\\\"is kite connected\\\"/\\\"data freshness\\\", intent=status.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
             },
             "id": "claude-parse-intent",
             "name": "Claude: Parse Intent",
@@ -486,6 +486,27 @@
                                         "id": "rule-ask",
                                         "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
                                         "rightValue": "ask",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
+                            }
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "rule-status",
+                                        "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
+                                        "rightValue": "status",
                                         "operator": {
                                             "type": "string",
                                             "operation": "equals"
@@ -963,52 +984,70 @@
                 "rules": {
                     "values": [
                         {
-                            "outputKey": "store_token",
                             "conditions": {
+                                "options": {
+                                    "caseSensitive": true,
+                                    "leftValue": "",
+                                    "typeValidation": "strict"
+                                },
                                 "conditions": [
                                     {
+                                        "id": "rule-login-store",
                                         "leftValue": "={{ $json.mode }}",
                                         "rightValue": "store_token",
                                         "operator": {
                                             "type": "string",
                                             "operation": "equals"
-                                        },
-                                        "id": "rule-login-0-0"
+                                        }
                                     }
                                 ],
-                                "combinator": "and",
+                                "combinator": "and"
+                            }
+                        },
+                        {
+                            "conditions": {
                                 "options": {
                                     "caseSensitive": true,
                                     "leftValue": "",
                                     "typeValidation": "strict"
-                                }
-                            }
-                        },
-                        {
-                            "outputKey": "exchange",
-                            "conditions": {
+                                },
                                 "conditions": [
                                     {
+                                        "id": "rule-login-exchange",
                                         "leftValue": "={{ $json.mode }}",
                                         "rightValue": "exchange",
                                         "operator": {
                                             "type": "string",
                                             "operation": "equals"
-                                        },
-                                        "id": "rule-login-1-0"
+                                        }
                                     }
                                 ],
-                                "combinator": "and",
+                                "combinator": "and"
+                            }
+                        },
+                        {
+                            "conditions": {
                                 "options": {
                                     "caseSensitive": true,
                                     "leftValue": "",
                                     "typeValidation": "strict"
-                                }
+                                },
+                                "conditions": [
+                                    {
+                                        "id": "rule-login-instructions",
+                                        "leftValue": "={{ $json.mode }}",
+                                        "rightValue": "instructions",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ],
+                                "combinator": "and"
                             }
                         }
                     ]
-                },
-                "fallbackOutput": "extra"
+                }
             },
             "id": "is-token-provided",
             "name": "Route Login Mode",
@@ -1070,7 +1109,7 @@
         {
             "parameters": {
                 "chatId": "={{ $('Handle LOGIN').first().json.chat_id }}",
-                "text": "\ud83d\udd11 *Kite Connect Login*\n\n1. Click the link below to login:\n[Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2. Complete Zerodha login\n3. From the redirect URL, copy the full URL or just the `request_token` value\n4. Send: `login YOUR_TOKEN`\n\nOr send your existing token directly:\n`login api_key:access_token`",
+                "text": "\ud83d\udd11 *Kite Connect Login*\n\n1\ufe0f\u20e3 Click the link below:\n[Login to Zerodha \u2192](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2\ufe0f\u20e3 Complete your Zerodha login\n\n3\ufe0f\u20e3 You'll be redirected back automatically \u2728\n   _(If the page shows \"Login Successful\", you're done!)_\n\n\ud83d\udccc *Manual fallback:* If auto-login fails, copy the `request\\_token` from the redirect URL and send:\n`login YOUR\\_TOKEN`\n\n_Token is valid until 6 AM next day._",
                 "additionalFields": {
                     "parse_mode": "Markdown",
                     "appendAttribution": false,
@@ -1920,6 +1959,225 @@
                 "specifyBody": "json",
                 "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
             }
+        },
+        {
+            "id": "typing-buy",
+            "name": "Typing Buy",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                -200
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-sell",
+            "name": "Typing Sell",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                -50
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-alert-set",
+            "name": "Typing Alert Set",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                100
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-portfolio",
+            "name": "Typing Portfolio",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                250
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-alerts-list",
+            "name": "Typing Alerts List",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                600
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-alert-cancel",
+            "name": "Typing Alert Cancel",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                700
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-login",
+            "name": "Typing Login",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                800
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "typing-status",
+            "name": "Typing Status",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                2260,
+                1400
+            ],
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "handle-status",
+            "name": "Handle STATUS",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2460,
+                1400
+            ],
+            "parameters": {
+                "jsCode": "const ctx = $('Parse Claude Response').first().json;\nreturn [{ json: {\n  chat_id: ctx.chat_id,\n  user_id: ctx.user_id\n}}];"
+            }
+        },
+        {
+            "id": "fetch-status-data",
+            "name": "Fetch Status Data",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.5,
+            "position": [
+                2680,
+                1400
+            ],
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT \n  ks.token_expiry,\n  ks.last_login_at,\n  CASE WHEN ks.token_expiry > NOW() THEN true ELSE false END as kite_active,\n  (SELECT COUNT(*) FROM holdings WHERE user_id = $1) as holdings_count,\n  (SELECT COUNT(*) FROM alerts WHERE user_id = $1 AND is_active = true) as active_alerts,\n  (SELECT MAX(data_date) FROM staging_data WHERE data_type = 'global_cues') as last_global_data,\n  (SELECT MAX(data_date) FROM staging_data WHERE data_type = 'technicals') as last_technicals,\n  (SELECT COUNT(DISTINCT symbol) FROM staging_data WHERE data_type = 'technicals' AND data_date = CURRENT_DATE) as technicals_today\nFROM kite_sessions ks\nJOIN users u ON ks.user_id = u.id\nWHERE u.is_kite_provider = true\nLIMIT 1",
+                "options": {
+                    "queryReplacement": "={{ [$('Handle STATUS').first().json.user_id] }}"
+                }
+            },
+            "credentials": {
+                "postgres": {
+                    "id": "6dSdIQ2xAFPzyEwe",
+                    "name": "Postgres account"
+                }
+            },
+            "onError": "continueRegularOutput"
+        },
+        {
+            "id": "format-status",
+            "name": "Format Status",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2900,
+                1400
+            ],
+            "parameters": {
+                "jsCode": "const d = $input.first().json;\nconst chatId = $('Handle STATUS').first().json.chat_id;\n\nconst kiteIcon = d.kite_active ? '\ud83d\udfe2' : '\ud83d\udd34';\nconst kiteStatus = d.kite_active \n  ? 'Active until ' + new Date(d.token_expiry).toLocaleTimeString('en-IN', {timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit'}) + ' IST'\n  : 'Expired \u2014 send /login to reconnect';\n\nconst lastGlobal = d.last_global_data \n  ? new Date(d.last_global_data).toLocaleDateString('en-IN') \n  : 'Never';\nconst lastTech = d.last_technicals \n  ? new Date(d.last_technicals).toLocaleDateString('en-IN')\n  : 'Never';\nconst techCount = d.technicals_today || 0;\n\nconst loginDate = d.last_login_at \n  ? new Date(d.last_login_at).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'})\n  : 'Never';\n\nconst msg = `\ud83d\udcca *StockPulse Status*\n\n${kiteIcon} *Kite Session:* ${kiteStatus}\n\ud83d\udcc5 Last Login: ${loginDate}\n\n\ud83d\udcc1 *Portfolio:* ${d.holdings_count || 0} holdings\n\ud83d\udd14 *Active Alerts:* ${d.active_alerts || 0}\n\n\ud83d\udcc8 *Market Data:*\n  Global Cues: ${lastGlobal}\n  Technicals: ${lastTech} (${techCount} stocks)\n\n${!d.kite_active ? '\\n\u26a0\ufe0f *Live prices unavailable.* Send /login to connect Kite.' : '\u2705 All systems operational.'}`;\n\nreturn [{ json: { chat_id: chatId, message: msg }}];"
+            }
+        },
+        {
+            "id": "send-status",
+            "name": "Send Status",
+            "type": "n8n-nodes-base.telegram",
+            "typeVersion": 1.2,
+            "position": [
+                3120,
+                1400
+            ],
+            "parameters": {
+                "chatId": "={{ $json.chat_id }}",
+                "text": "={{ $json.message }}",
+                "additionalFields": {
+                    "parse_mode": "Markdown",
+                    "appendAttribution": false,
+                    "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"\ud83d\udd04 Login Kite\", \"callback_data\": \"login\"}, {\"text\": \"\ud83d\udcca Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"\ud83d\udcf0 Briefing\", \"callback_data\": \"briefing\"}]]}"
+                }
+            },
+            "credentials": {
+                "telegramApi": {
+                    "id": "oh2jj2bRbyNVQvgB",
+                    "name": "Telegram account"
+                }
+            }
         }
     ],
     "connections": {
@@ -2040,28 +2298,28 @@
             "main": [
                 [
                     {
-                        "node": "Handle BUY",
+                        "node": "Typing Buy",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Handle SELL",
+                        "node": "Typing Sell",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Handle ALERT SET",
+                        "node": "Typing Alert Set",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Handle PORTFOLIO",
+                        "node": "Typing Portfolio",
                         "type": "main",
                         "index": 0
                     }
@@ -2082,21 +2340,21 @@
                 ],
                 [
                     {
-                        "node": "Fetch Active Alerts",
+                        "node": "Typing Alerts List",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Prepare Alert Cancel",
+                        "node": "Typing Alert Cancel",
                         "type": "main",
                         "index": 0
                     }
                 ],
                 [
                     {
-                        "node": "Handle LOGIN",
+                        "node": "Typing Login",
                         "type": "main",
                         "index": 0
                     }
@@ -2125,6 +2383,13 @@
                 [
                     {
                         "node": "Handle Unknown",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Typing Status",
                         "type": "main",
                         "index": 0
                     }
@@ -2625,19 +2890,141 @@
                     }
                 ]
             ]
+        },
+        "Typing Buy": {
+            "main": [
+                [
+                    {
+                        "node": "Handle BUY",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Sell": {
+            "main": [
+                [
+                    {
+                        "node": "Handle SELL",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Alert Set": {
+            "main": [
+                [
+                    {
+                        "node": "Handle ALERT SET",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Portfolio": {
+            "main": [
+                [
+                    {
+                        "node": "Handle PORTFOLIO",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Alerts List": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Active Alerts",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Alert Cancel": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Alert Cancel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Login": {
+            "main": [
+                [
+                    {
+                        "node": "Handle LOGIN",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Typing Status": {
+            "main": [
+                [
+                    {
+                        "node": "Handle STATUS",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Handle STATUS": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Status Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Status Data": {
+            "main": [
+                [
+                    {
+                        "node": "Format Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Status": {
+            "main": [
+                [
+                    {
+                        "node": "Send Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
     },
     "settings": {
         "executionOrder": "v1",
         "callerPolicy": "workflowsFromSameOwner",
-        "availableInMCP": false
+        "availableInMCP": false,
+        "errorWorkflow": "qqOLliH0fuL8mq9x"
     },
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
-    "activeVersionId": "932651ba-6efc-457c-a943-ce09570ebc25",
-    "versionCounter": 145,
+    "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
+    "activeVersionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
+    "versionCounter": 157,
     "triggerCount": 1,
     "shared": [
         {
@@ -2660,9 +3047,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-19T06:42:32.629Z",
-        "createdAt": "2026-02-19T06:42:32.629Z",
-        "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
+        "updatedAt": "2026-02-20T02:31:04.351Z",
+        "createdAt": "2026-02-20T02:31:04.351Z",
+        "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
         "workflowId": "kGn3KwIfHldiwuGW",
         "nodes": [
             {
@@ -2844,7 +3231,7 @@
                     },
                     "sendBody": true,
                     "specifyBody": "json",
-                    "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
+                    "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, system: 'You are a stock trading message parser for Indian markets (NSE/BSE).\\nExtract intent and data from user messages. Respond ONLY in valid JSON format with no other text:\\n{\\n  \"intent\": \"buy|sell|alert_set|alert_cancel|portfolio|analyze|briefing|alerts_list|sync|login|settings|help|ask|clarify|status|unknown\",\\n  \"symbol\": \"STOCK_SYMBOL or null\",\\n  \"quantity\": \"number or null\",\\n  \"price\": \"number or null\",\\n  \"lower_bound\": \"number or null\",\\n  \"upper_bound\": \"number or null\",\\n  \"request_token\": \"string or null\",\\n  \"raw_query\": \"original message if intent is analyze, ask, or unknown\",\\n  \"query\": \"the specific question being asked if intent is ask\"\\n}\\n\\nMap common names: Reliance->RELIANCE, Infosys->INFY, TCS->TCS, HDFC Bank->HDFCBANK,\\nTata Motors->TATAMOTORS, Wipro->WIPRO, ITC->ITC, SBI->SBIN, Axis Bank->AXISBANK,\\nKotak->KOTAKBANK, Bajaj Finance->BAJFINANCE, HCL Tech->HCLTECH, Asian Paints->ASIANPAINT,\\nMaruti->MARUTI, Sun Pharma->SUNPHARMA, Titan->TITAN, L&T->LT, Adani->ADANIENT, Bharti Airtel->BHARTIARTL.\\nDefault exchange: NSE. If date not mentioned, use today. If price not mentioned, set null.\\nFor \"alert\" or \"set alert\", extract symbol + bounds. \"alert reliance 2800-2950\" means lower=2800, upper=2950.\\nFor \"portfolio\"/\"holdings\"/\"what do i own\", intent=portfolio.\\nFor \"analyze X\", \"analysis of X\", \"check X\", \"deep dive X\", intent=analyze with symbol.\\nFor \"predict X\", \"when will X hit Y\", intent=analyze (map predict->analyze) with symbol and upper_bound.\\nFor \"briefing\"/\"morning update\"/\"market update\", intent=briefing.\\nFor natural language questions like \"why did X fall?\", \"top 5 losses\", \"what should I sell?\",\\n\"how is my portfolio doing?\", intent=ask, query=the question text, symbol=X if mentioned.\\nFor callback data like \"sell_RELIANCE_market\", parse as intent=sell, symbol=RELIANCE.\\nFor \"login ABC123\", intent=login, request_token=ABC123. For bare \"login\", intent=login, request_token=null.\\nFor \\\"status\\\"/\\\"system status\\\"/\\\"kite status\\\"/\\\"is kite connected\\\"/\\\"data freshness\\\", intent=status.', messages: [{ role: 'user', content: $json.message_text }] }) }}"
                 },
                 "id": "claude-parse-intent",
                 "name": "Claude: Parse Intent",
@@ -3144,6 +3531,27 @@
                                             "id": "rule-ask",
                                             "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
                                             "rightValue": "ask",
+                                            "operator": {
+                                                "type": "string",
+                                                "operation": "equals"
+                                            }
+                                        }
+                                    ],
+                                    "combinator": "and"
+                                }
+                            },
+                            {
+                                "conditions": {
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict"
+                                    },
+                                    "conditions": [
+                                        {
+                                            "id": "rule-status",
+                                            "leftValue": "={{ $(\"Parse Claude Response\").item.json.intent }}",
+                                            "rightValue": "status",
                                             "operator": {
                                                 "type": "string",
                                                 "operation": "equals"
@@ -3621,52 +4029,70 @@
                     "rules": {
                         "values": [
                             {
-                                "outputKey": "store_token",
                                 "conditions": {
+                                    "options": {
+                                        "caseSensitive": true,
+                                        "leftValue": "",
+                                        "typeValidation": "strict"
+                                    },
                                     "conditions": [
                                         {
+                                            "id": "rule-login-store",
                                             "leftValue": "={{ $json.mode }}",
                                             "rightValue": "store_token",
                                             "operator": {
                                                 "type": "string",
                                                 "operation": "equals"
-                                            },
-                                            "id": "rule-login-0-0"
+                                            }
                                         }
                                     ],
-                                    "combinator": "and",
+                                    "combinator": "and"
+                                }
+                            },
+                            {
+                                "conditions": {
                                     "options": {
                                         "caseSensitive": true,
                                         "leftValue": "",
                                         "typeValidation": "strict"
-                                    }
-                                }
-                            },
-                            {
-                                "outputKey": "exchange",
-                                "conditions": {
+                                    },
                                     "conditions": [
                                         {
+                                            "id": "rule-login-exchange",
                                             "leftValue": "={{ $json.mode }}",
                                             "rightValue": "exchange",
                                             "operator": {
                                                 "type": "string",
                                                 "operation": "equals"
-                                            },
-                                            "id": "rule-login-1-0"
+                                            }
                                         }
                                     ],
-                                    "combinator": "and",
+                                    "combinator": "and"
+                                }
+                            },
+                            {
+                                "conditions": {
                                     "options": {
                                         "caseSensitive": true,
                                         "leftValue": "",
                                         "typeValidation": "strict"
-                                    }
+                                    },
+                                    "conditions": [
+                                        {
+                                            "id": "rule-login-instructions",
+                                            "leftValue": "={{ $json.mode }}",
+                                            "rightValue": "instructions",
+                                            "operator": {
+                                                "type": "string",
+                                                "operation": "equals"
+                                            }
+                                        }
+                                    ],
+                                    "combinator": "and"
                                 }
                             }
                         ]
-                    },
-                    "fallbackOutput": "extra"
+                    }
                 },
                 "id": "is-token-provided",
                 "name": "Route Login Mode",
@@ -3728,7 +4154,7 @@
             {
                 "parameters": {
                     "chatId": "={{ $('Handle LOGIN').first().json.chat_id }}",
-                    "text": "\ud83d\udd11 *Kite Connect Login*\n\n1. Click the link below to login:\n[Login to Zerodha](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2. Complete Zerodha login\n3. From the redirect URL, copy the full URL or just the `request_token` value\n4. Send: `login YOUR_TOKEN`\n\nOr send your existing token directly:\n`login api_key:access_token`",
+                    "text": "\ud83d\udd11 *Kite Connect Login*\n\n1\ufe0f\u20e3 Click the link below:\n[Login to Zerodha \u2192](https://kite.zerodha.com/connect/login?v=3&api_key=gifzm9kfars6kr8x)\n\n2\ufe0f\u20e3 Complete your Zerodha login\n\n3\ufe0f\u20e3 You'll be redirected back automatically \u2728\n   _(If the page shows \"Login Successful\", you're done!)_\n\n\ud83d\udccc *Manual fallback:* If auto-login fails, copy the `request\\_token` from the redirect URL and send:\n`login YOUR\\_TOKEN`\n\n_Token is valid until 6 AM next day._",
                     "additionalFields": {
                         "parse_mode": "Markdown",
                         "appendAttribution": false,
@@ -4578,6 +5004,225 @@
                     "specifyBody": "json",
                     "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
                 }
+            },
+            {
+                "id": "typing-buy",
+                "name": "Typing Buy",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    -200
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-sell",
+                "name": "Typing Sell",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    -50
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-alert-set",
+                "name": "Typing Alert Set",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    100
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-portfolio",
+                "name": "Typing Portfolio",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    250
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-alerts-list",
+                "name": "Typing Alerts List",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    600
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-alert-cancel",
+                "name": "Typing Alert Cancel",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    700
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-login",
+                "name": "Typing Login",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    800
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "typing-status",
+                "name": "Typing Status",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 4.2,
+                "position": [
+                    2260,
+                    1400
+                ],
+                "parameters": {
+                    "method": "POST",
+                    "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendChatAction",
+                    "sendBody": true,
+                    "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ chat_id: $(\"Parse Claude Response\").item.json.chat_id, action: \"typing\" }) }}"
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "handle-status",
+                "name": "Handle STATUS",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2460,
+                    1400
+                ],
+                "parameters": {
+                    "jsCode": "const ctx = $('Parse Claude Response').first().json;\nreturn [{ json: {\n  chat_id: ctx.chat_id,\n  user_id: ctx.user_id\n}}];"
+                }
+            },
+            {
+                "id": "fetch-status-data",
+                "name": "Fetch Status Data",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 2.5,
+                "position": [
+                    2680,
+                    1400
+                ],
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT \n  ks.token_expiry,\n  ks.last_login_at,\n  CASE WHEN ks.token_expiry > NOW() THEN true ELSE false END as kite_active,\n  (SELECT COUNT(*) FROM holdings WHERE user_id = $1) as holdings_count,\n  (SELECT COUNT(*) FROM alerts WHERE user_id = $1 AND is_active = true) as active_alerts,\n  (SELECT MAX(data_date) FROM staging_data WHERE data_type = 'global_cues') as last_global_data,\n  (SELECT MAX(data_date) FROM staging_data WHERE data_type = 'technicals') as last_technicals,\n  (SELECT COUNT(DISTINCT symbol) FROM staging_data WHERE data_type = 'technicals' AND data_date = CURRENT_DATE) as technicals_today\nFROM kite_sessions ks\nJOIN users u ON ks.user_id = u.id\nWHERE u.is_kite_provider = true\nLIMIT 1",
+                    "options": {
+                        "queryReplacement": "={{ [$('Handle STATUS').first().json.user_id] }}"
+                    }
+                },
+                "credentials": {
+                    "postgres": {
+                        "id": "6dSdIQ2xAFPzyEwe",
+                        "name": "Postgres account"
+                    }
+                },
+                "onError": "continueRegularOutput"
+            },
+            {
+                "id": "format-status",
+                "name": "Format Status",
+                "type": "n8n-nodes-base.code",
+                "typeVersion": 2,
+                "position": [
+                    2900,
+                    1400
+                ],
+                "parameters": {
+                    "jsCode": "const d = $input.first().json;\nconst chatId = $('Handle STATUS').first().json.chat_id;\n\nconst kiteIcon = d.kite_active ? '\ud83d\udfe2' : '\ud83d\udd34';\nconst kiteStatus = d.kite_active \n  ? 'Active until ' + new Date(d.token_expiry).toLocaleTimeString('en-IN', {timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit'}) + ' IST'\n  : 'Expired \u2014 send /login to reconnect';\n\nconst lastGlobal = d.last_global_data \n  ? new Date(d.last_global_data).toLocaleDateString('en-IN') \n  : 'Never';\nconst lastTech = d.last_technicals \n  ? new Date(d.last_technicals).toLocaleDateString('en-IN')\n  : 'Never';\nconst techCount = d.technicals_today || 0;\n\nconst loginDate = d.last_login_at \n  ? new Date(d.last_login_at).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'})\n  : 'Never';\n\nconst msg = `\ud83d\udcca *StockPulse Status*\n\n${kiteIcon} *Kite Session:* ${kiteStatus}\n\ud83d\udcc5 Last Login: ${loginDate}\n\n\ud83d\udcc1 *Portfolio:* ${d.holdings_count || 0} holdings\n\ud83d\udd14 *Active Alerts:* ${d.active_alerts || 0}\n\n\ud83d\udcc8 *Market Data:*\n  Global Cues: ${lastGlobal}\n  Technicals: ${lastTech} (${techCount} stocks)\n\n${!d.kite_active ? '\\n\u26a0\ufe0f *Live prices unavailable.* Send /login to connect Kite.' : '\u2705 All systems operational.'}`;\n\nreturn [{ json: { chat_id: chatId, message: msg }}];"
+                }
+            },
+            {
+                "id": "send-status",
+                "name": "Send Status",
+                "type": "n8n-nodes-base.telegram",
+                "typeVersion": 1.2,
+                "position": [
+                    3120,
+                    1400
+                ],
+                "parameters": {
+                    "chatId": "={{ $json.chat_id }}",
+                    "text": "={{ $json.message }}",
+                    "additionalFields": {
+                        "parse_mode": "Markdown",
+                        "appendAttribution": false,
+                        "reply_markup": "{\"inline_keyboard\": [[{\"text\": \"\ud83d\udd04 Login Kite\", \"callback_data\": \"login\"}, {\"text\": \"\ud83d\udcca Portfolio\", \"callback_data\": \"portfolio\"}], [{\"text\": \"\ud83d\udcf0 Briefing\", \"callback_data\": \"briefing\"}]]}"
+                    }
+                },
+                "credentials": {
+                    "telegramApi": {
+                        "id": "oh2jj2bRbyNVQvgB",
+                        "name": "Telegram account"
+                    }
+                }
             }
         ],
         "connections": {
@@ -4698,28 +5343,28 @@
                 "main": [
                     [
                         {
-                            "node": "Handle BUY",
+                            "node": "Typing Buy",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Handle SELL",
+                            "node": "Typing Sell",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Handle ALERT SET",
+                            "node": "Typing Alert Set",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Handle PORTFOLIO",
+                            "node": "Typing Portfolio",
                             "type": "main",
                             "index": 0
                         }
@@ -4740,21 +5385,21 @@
                     ],
                     [
                         {
-                            "node": "Fetch Active Alerts",
+                            "node": "Typing Alerts List",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Prepare Alert Cancel",
+                            "node": "Typing Alert Cancel",
                             "type": "main",
                             "index": 0
                         }
                     ],
                     [
                         {
-                            "node": "Handle LOGIN",
+                            "node": "Typing Login",
                             "type": "main",
                             "index": 0
                         }
@@ -4783,6 +5428,13 @@
                     [
                         {
                             "node": "Handle Unknown",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Typing Status",
                             "type": "main",
                             "index": 0
                         }
@@ -5283,6 +5935,127 @@
                         }
                     ]
                 ]
+            },
+            "Typing Buy": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle BUY",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Sell": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle SELL",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Alert Set": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle ALERT SET",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Portfolio": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle PORTFOLIO",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Alerts List": {
+                "main": [
+                    [
+                        {
+                            "node": "Fetch Active Alerts",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Alert Cancel": {
+                "main": [
+                    [
+                        {
+                            "node": "Prepare Alert Cancel",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Login": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle LOGIN",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Typing Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Handle STATUS",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Handle STATUS": {
+                "main": [
+                    [
+                        {
+                            "node": "Fetch Status Data",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Fetch Status Data": {
+                "main": [
+                    [
+                        {
+                            "node": "Format Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Format Status": {
+                "main": [
+                    [
+                        {
+                            "node": "Send Status",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
             }
         },
         "authors": "Vipindas S",
@@ -5291,18 +6064,18 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-19T06:42:33.555Z",
-                "id": 211,
+                "createdAt": "2026-02-20T02:31:05.430Z",
+                "id": 225,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
+                "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-19T06:42:35.012Z",
-                "id": 212,
+                "createdAt": "2026-02-20T02:31:06.751Z",
+                "id": 226,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "932651ba-6efc-457c-a943-ce09570ebc25",
+                "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }

@@ -1,0 +1,252 @@
+{
+  "id": "hTJTWtMihWIjGZfi",
+  "name": "WF_KITE_CALLBACK - Kite OAuth Handler",
+  "active": true,
+  "webhookUrl": "https://stockpulse.co.in/webhook/kite-callback",
+  "createdAt": "2026-02-20T02:21:33.292Z",
+  "updatedAt": "2026-02-20T02:21:33.292Z",
+  "versionId": "30296cce-2c7e-4820-ae10-1566b2b46218",
+  "nodes": [
+    {
+      "id": "kite-callback-webhook",
+      "name": "Kite OAuth Callback",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "kite-callback",
+      "parameters": {
+        "path": "kite-callback",
+        "httpMethod": "GET",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "check-token",
+      "name": "Check Callback Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst requestToken = query.request_token || '';\nconst status = query.status || '';\nconst type = query.type || '';\n\nif (status !== 'success' || !requestToken) {\n  return [{ json: {\n    valid: false,\n    error: 'Missing or failed token: status=' + status,\n    request_token: ''\n  }}];\n}\n\nreturn [{ json: {\n  valid: true,\n  request_token: requestToken,\n  status: status,\n  type: type\n}}];"
+      }
+    },
+    {
+      "id": "is-valid-callback",
+      "name": "Token Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "fetch-kite-creds",
+      "name": "Fetch Kite Credentials",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.id as user_id, u.telegram_user_id, u.private_chat_id as chat_id,\n       u.kite_api_key_encrypted as api_key,\n       u.kite_api_secret_encrypted as api_secret\nFROM users u\nWHERE u.is_kite_provider = true\nLIMIT 1"
+      }
+    },
+    {
+      "id": "compute-checksum-cb",
+      "name": "Compute Checksum",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst creds = $('Fetch Kite Credentials').first().json;\nconst token = $('Check Callback Params').first().json.request_token;\n\nconst apiKey = creds.api_key;\nconst apiSecret = creds.api_secret;\nconst requestToken = token;\n\nconst checksum = crypto.createHash('sha256')\n  .update(apiKey + requestToken + apiSecret)\n  .digest('hex');\n\nreturn [{ json: {\n  api_key: apiKey,\n  request_token: requestToken,\n  checksum: checksum,\n  user_id: creds.user_id,\n  telegram_user_id: creds.telegram_user_id,\n  chat_id: creds.chat_id\n}}];"
+      }
+    },
+    {
+      "id": "kite-exchange-cb",
+      "name": "Exchange Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.kite.trade/session/token",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ api_key: $json.api_key, request_token: $json.request_token, checksum: $json.checksum }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Kite-Version",
+              "value": "3"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "store-token-cb",
+      "name": "Store Token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1560, 200],
+      "credentials": {
+        "postgres": {
+          "id": "6dSdIQ2xAFPzyEwe",
+          "name": "Postgres account"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO kite_sessions (user_id, access_token_encrypted, token_expiry, last_login_at)\nVALUES ($1, $2, NOW() + INTERVAL '18 hours', NOW())\nON CONFLICT (user_id) DO UPDATE SET\n  access_token_encrypted = EXCLUDED.access_token_encrypted,\n  token_expiry = EXCLUDED.token_expiry,\n  last_login_at = NOW()\nRETURNING user_id, token_expiry",
+        "additionalFields": {
+          "queryParams": "={{ [$('Compute Checksum').first().json.user_id, $input.first().json.data?.access_token || $input.first().json.access_token || ''] }}"
+        }
+      }
+    },
+    {
+      "id": "notify-user-cb",
+      "name": "Notify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot8253200545:AAGzywflmgSpKU8aY457FmBGUv0e_ojT6aI/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $('Compute Checksum').first().json.chat_id, text: \"\\u2705 *Kite Login Successful!*\\n\\nYour Zerodha session is now active. Live prices enabled!\\n\\nSend /briefing for today's market briefing or /portfolio to see your holdings.\", parse_mode: \"Markdown\", reply_markup: JSON.stringify({ inline_keyboard: [[{ text: \"\\ud83d\\udcca Portfolio\", callback_data: \"portfolio\" }, { text: \"\\ud83d\\udcf0 Briefing\", callback_data: \"briefing\" }]] }) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "success-response",
+      "name": "Login Success Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2000, 200],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>StockPulse - Login Successful</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0a0f1a;color:#fff}.card{text-align:center;padding:40px;background:#111827;border-radius:16px;max-width:400px}.icon{font-size:64px;margin-bottom:16px}h1{color:#10b981;margin:0 0 8px}p{color:#9ca3af;margin:8px 0}.btn{display:inline-block;margin-top:24px;padding:12px 24px;background:#10b981;color:#fff;border-radius:8px;text-decoration:none;font-weight:600}</style></head><body><div class=\"card\"><div class=\"icon\">&#x2705;</div><h1>Login Successful!</h1><p>Your Kite session is now active.</p><p>Return to Telegram to continue.</p><a class=\"btn\" href=\"https://t.me/\">Open Telegram</a></div></body></html>",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "error-response",
+      "name": "Login Error Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 420],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>StockPulse - Login Failed</title><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0a0f1a;color:#fff}.card{text-align:center;padding:40px;background:#111827;border-radius:16px;max-width:400px}.icon{font-size:64px;margin-bottom:16px}h1{color:#ef4444;margin:0 0 8px}p{color:#9ca3af;margin:8px 0}.btn{display:inline-block;margin-top:24px;padding:12px 24px;background:#10b981;color:#fff;border-radius:8px;text-decoration:none;font-weight:600}</style></head><body><div class=\"card\"><div class=\"icon\">&#x274c;</div><h1>Login Failed</h1><p>The login link may have expired.</p><p>Return to Telegram and try again.</p><a class=\"btn\" href=\"https://t.me/\">Open Telegram</a></div></body></html>",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Kite OAuth Callback": {
+      "main": [
+        [
+          { "node": "Check Callback Params", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check Callback Params": {
+      "main": [
+        [
+          { "node": "Token Valid?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Token Valid?": {
+      "main": [
+        [
+          { "node": "Fetch Kite Credentials", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Login Error Page", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Kite Credentials": {
+      "main": [
+        [
+          { "node": "Compute Checksum", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Compute Checksum": {
+      "main": [
+        [
+          { "node": "Exchange Token", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Exchange Token": {
+      "main": [
+        [
+          { "node": "Store Token", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Store Token": {
+      "main": [
+        [
+          { "node": "Notify User", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify User": {
+      "main": [
+        [
+          { "node": "Login Success Page", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
