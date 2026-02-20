@@ -1,5 +1,5 @@
 {
-    "updatedAt": "2026-02-20T02:31:04.348Z",
+    "updatedAt": "2026-02-20T04:39:25.310Z",
     "createdAt": "2026-02-18T07:36:36.580Z",
     "id": "kGn3KwIfHldiwuGW",
     "name": "WF1 \u2014 Message Handler",
@@ -1739,7 +1739,7 @@
                 -200
             ],
             "parameters": {
-                "jsCode": "const crypto = require('crypto');\nconst prev = $('Handle LOGIN').first().json;\nconst db = $input.first().json;\n\nconst api_key = db.api_key || 'gifzm9kfars6kr8x';\nconst api_secret = db.api_secret;\nconst request_token = prev.request_token;\n\nif (!api_secret) {\n  // No API secret in DB - can't exchange. Tell user.\n  return [{ json: {\n    error: true,\n    chat_id: prev.chat_id,\n    user_id: prev.user_id,\n    message: \"\u26a0\ufe0f *Kite API Secret Not Configured*\\n\\nThe Kite API secret is not set up yet. Please contact admin to configure `kite_api_secret_encrypted` in the users table.\\n\\nAlternatively, you can provide your access token directly:\\n`login api_key:access_token`\"\n  }}];\n}\n\n// Compute SHA256 checksum: api_key + request_token + api_secret\nconst checksum = crypto.createHash('sha256')\n  .update(api_key + request_token + api_secret)\n  .digest('hex');\n\nreturn [{ json: {\n  error: false,\n  chat_id: prev.chat_id,\n  user_id: prev.user_id,\n  api_key: api_key,\n  request_token: request_token,\n  checksum: checksum\n}}];"
+                "jsCode": "// Pure JS SHA256 - no modules needed\nfunction sha256(ascii) {\n  function rr(v, a) { return (v >>> a) | (v << (32 - a)); }\n  var mp = Math.pow, mw = 4294967296, r = \"\", w = [], abl = ascii.length * 8;\n  var h = [], k = [], pc = 0, ic = {};\n  for (var c = 2; pc < 64; c++) {\n    if (!ic[c]) {\n      for (var i = 0; i < 313; i += c) ic[i] = c;\n      h[pc] = (mp(c, .5) * mw) | 0;\n      k[pc++] = (mp(c, 1/3) * mw) | 0;\n    }\n  }\n  ascii += \"\u0080\";\n  while (ascii.length % 64 - 56) ascii += \"\u0000\";\n  for (i = 0; i < ascii.length; i++) {\n    var j = ascii.charCodeAt(i);\n    w[i >> 2] |= j << ((3 - i) % 4) * 8;\n  }\n  w[w.length] = (abl / mw) | 0;\n  w[w.length] = abl;\n  for (j = 0; j < w.length;) {\n    var ww = w.slice(j, j += 16), oh = h;\n    h = h.slice(0, 8);\n    for (i = 0; i < 64; i++) {\n      var w15 = ww[i-15], w2 = ww[i-2], a = h[0], e = h[4];\n      var t1 = h[7] + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & h[5]) ^ (~e & h[6])) + k[i]\n        + (ww[i] = i < 16 ? ww[i] : (ww[i-16] + (rr(w15,7) ^ rr(w15,18) ^ (w15>>>3)) + ww[i-7] + (rr(w2,17) ^ rr(w2,19) ^ (w2>>>10))) | 0);\n      var t2 = (rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & h[1]) ^ (a & h[2]) ^ (h[1] & h[2]));\n      h = [(t1 + t2) | 0].concat(h);\n      h[4] = (h[4] + t1) | 0;\n    }\n    for (i = 0; i < 8; i++) h[i] = (h[i] + oh[i]) | 0;\n  }\n  for (i = 0; i < 8; i++)\n    for (j = 3; j + 1; j--)\n      r += ((h[i] >> (j * 8) & 255) < 16 ? \"0\" : \"\") + (h[i] >> (j * 8) & 255).toString(16);\n  return r;\n}\n\nconst creds = $(\"Fetch Kite API Secret\").first().json;\nconst loginData = $(\"Handle LOGIN\").first().json;\nconst token = loginData.request_token;\nconst chatId = loginData.chat_id;\nconst userId = loginData.user_id;\n\nconst apiKey = creds.api_key || \"\";\nconst apiSecret = creds.api_secret || \"\";\n\nif (!apiKey || !apiSecret) {\n  return [{ json: {\n    error: true,\n    message: \"Kite API credentials not configured. Please contact admin.\",\n    chat_id: chatId\n  }}];\n}\n\nif (!token) {\n  return [{ json: {\n    error: true,\n    message: \"No request token provided.\",\n    chat_id: chatId\n  }}];\n}\n\nconst checksum = sha256(apiKey + token + apiSecret);\n\nreturn [{ json: {\n  error: false,\n  api_key: apiKey,\n  request_token: token,\n  checksum: checksum,\n  user_id: userId,\n  chat_id: chatId\n}}];"
             }
         },
         {
@@ -3022,9 +3022,9 @@
     "staticData": null,
     "meta": null,
     "pinData": null,
-    "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
-    "activeVersionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
-    "versionCounter": 157,
+    "versionId": "fb25ac74-e4ad-4520-b097-93e0f4ebd2c9",
+    "activeVersionId": "fb25ac74-e4ad-4520-b097-93e0f4ebd2c9",
+    "versionCounter": 166,
     "triggerCount": 1,
     "shared": [
         {
@@ -3047,9 +3047,9 @@
     ],
     "tags": [],
     "activeVersion": {
-        "updatedAt": "2026-02-20T02:31:04.351Z",
-        "createdAt": "2026-02-20T02:31:04.351Z",
-        "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
+        "updatedAt": "2026-02-20T04:39:25.314Z",
+        "createdAt": "2026-02-20T04:39:25.314Z",
+        "versionId": "fb25ac74-e4ad-4520-b097-93e0f4ebd2c9",
         "workflowId": "kGn3KwIfHldiwuGW",
         "nodes": [
             {
@@ -4784,7 +4784,7 @@
                     -200
                 ],
                 "parameters": {
-                    "jsCode": "const crypto = require('crypto');\nconst prev = $('Handle LOGIN').first().json;\nconst db = $input.first().json;\n\nconst api_key = db.api_key || 'gifzm9kfars6kr8x';\nconst api_secret = db.api_secret;\nconst request_token = prev.request_token;\n\nif (!api_secret) {\n  // No API secret in DB - can't exchange. Tell user.\n  return [{ json: {\n    error: true,\n    chat_id: prev.chat_id,\n    user_id: prev.user_id,\n    message: \"\u26a0\ufe0f *Kite API Secret Not Configured*\\n\\nThe Kite API secret is not set up yet. Please contact admin to configure `kite_api_secret_encrypted` in the users table.\\n\\nAlternatively, you can provide your access token directly:\\n`login api_key:access_token`\"\n  }}];\n}\n\n// Compute SHA256 checksum: api_key + request_token + api_secret\nconst checksum = crypto.createHash('sha256')\n  .update(api_key + request_token + api_secret)\n  .digest('hex');\n\nreturn [{ json: {\n  error: false,\n  chat_id: prev.chat_id,\n  user_id: prev.user_id,\n  api_key: api_key,\n  request_token: request_token,\n  checksum: checksum\n}}];"
+                    "jsCode": "// Pure JS SHA256 - no modules needed\nfunction sha256(ascii) {\n  function rr(v, a) { return (v >>> a) | (v << (32 - a)); }\n  var mp = Math.pow, mw = 4294967296, r = \"\", w = [], abl = ascii.length * 8;\n  var h = [], k = [], pc = 0, ic = {};\n  for (var c = 2; pc < 64; c++) {\n    if (!ic[c]) {\n      for (var i = 0; i < 313; i += c) ic[i] = c;\n      h[pc] = (mp(c, .5) * mw) | 0;\n      k[pc++] = (mp(c, 1/3) * mw) | 0;\n    }\n  }\n  ascii += \"\u0080\";\n  while (ascii.length % 64 - 56) ascii += \"\u0000\";\n  for (i = 0; i < ascii.length; i++) {\n    var j = ascii.charCodeAt(i);\n    w[i >> 2] |= j << ((3 - i) % 4) * 8;\n  }\n  w[w.length] = (abl / mw) | 0;\n  w[w.length] = abl;\n  for (j = 0; j < w.length;) {\n    var ww = w.slice(j, j += 16), oh = h;\n    h = h.slice(0, 8);\n    for (i = 0; i < 64; i++) {\n      var w15 = ww[i-15], w2 = ww[i-2], a = h[0], e = h[4];\n      var t1 = h[7] + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & h[5]) ^ (~e & h[6])) + k[i]\n        + (ww[i] = i < 16 ? ww[i] : (ww[i-16] + (rr(w15,7) ^ rr(w15,18) ^ (w15>>>3)) + ww[i-7] + (rr(w2,17) ^ rr(w2,19) ^ (w2>>>10))) | 0);\n      var t2 = (rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & h[1]) ^ (a & h[2]) ^ (h[1] & h[2]));\n      h = [(t1 + t2) | 0].concat(h);\n      h[4] = (h[4] + t1) | 0;\n    }\n    for (i = 0; i < 8; i++) h[i] = (h[i] + oh[i]) | 0;\n  }\n  for (i = 0; i < 8; i++)\n    for (j = 3; j + 1; j--)\n      r += ((h[i] >> (j * 8) & 255) < 16 ? \"0\" : \"\") + (h[i] >> (j * 8) & 255).toString(16);\n  return r;\n}\n\nconst creds = $(\"Fetch Kite API Secret\").first().json;\nconst loginData = $(\"Handle LOGIN\").first().json;\nconst token = loginData.request_token;\nconst chatId = loginData.chat_id;\nconst userId = loginData.user_id;\n\nconst apiKey = creds.api_key || \"\";\nconst apiSecret = creds.api_secret || \"\";\n\nif (!apiKey || !apiSecret) {\n  return [{ json: {\n    error: true,\n    message: \"Kite API credentials not configured. Please contact admin.\",\n    chat_id: chatId\n  }}];\n}\n\nif (!token) {\n  return [{ json: {\n    error: true,\n    message: \"No request token provided.\",\n    chat_id: chatId\n  }}];\n}\n\nconst checksum = sha256(apiKey + token + apiSecret);\n\nreturn [{ json: {\n  error: false,\n  api_key: apiKey,\n  request_token: token,\n  checksum: checksum,\n  user_id: userId,\n  chat_id: chatId\n}}];"
                 }
             },
             {
@@ -6064,18 +6064,18 @@
         "autosaved": false,
         "workflowPublishHistory": [
             {
-                "createdAt": "2026-02-20T02:31:05.430Z",
-                "id": 225,
+                "createdAt": "2026-02-20T04:39:26.256Z",
+                "id": 241,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
+                "versionId": "fb25ac74-e4ad-4520-b097-93e0f4ebd2c9",
                 "event": "deactivated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             },
             {
-                "createdAt": "2026-02-20T02:31:06.751Z",
-                "id": 226,
+                "createdAt": "2026-02-20T04:39:27.640Z",
+                "id": 242,
                 "workflowId": "kGn3KwIfHldiwuGW",
-                "versionId": "e0dcba09-c026-4f4e-b0a8-e582b50a694f",
+                "versionId": "fb25ac74-e4ad-4520-b097-93e0f4ebd2c9",
                 "event": "activated",
                 "userId": "88dcc745-8de1-40a7-a5c3-0cbc3021a882"
             }
